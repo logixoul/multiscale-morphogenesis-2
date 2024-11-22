@@ -13,6 +13,31 @@
 
 typedef WrapModes::GetWrapped WrapMode;
 
+Array2D<vec3> resize(Array2D<vec3> src, ivec2 dstSize, const ci::FilterBase& filter)
+{
+	ci::SurfaceT<float> tmpSurface(
+		(float*)src.data, src.w, src.h, /*rowBytes*/sizeof(vec3) * src.w, ci::SurfaceChannelOrder::RGB);
+	auto resizedSurface = ci::ip::resizeCopy(tmpSurface, tmpSurface.getBounds(), dstSize, filter);
+	Array2D<vec3> resultArray = resizedSurface;
+	return resultArray;
+}
+
+Array2D<float> resize(Array2D<float> src, ivec2 dstSize, const ci::FilterBase& filter)
+{
+	ci::ChannelT<float> tmpSurface(
+		src.w, src.h, /*rowBytes*/sizeof(float) * src.w, 1, src.data);
+	ci::ChannelT<float> resizedSurface(dstSize.x, dstSize.y);
+	ci::ip::resize(tmpSurface, &resizedSurface, filter);
+	Array2D<float> resultArray = resizedSurface;
+	return resultArray;
+}
+gl::TextureRef redToLuminance(gl::TextureRef const& in) {
+	return shade2(in,
+		"_out.rgb = vec3(fetch1());",
+		ShadeOpts().ifmt(GL_RGBA16F)
+	);
+}
+
 inline Array2D<float> to01_Cut(Array2D<float> in) {
 	Array2D<float> tmp = in.clone();
 	std::sort(tmp.begin(), tmp.end());
@@ -147,7 +172,7 @@ struct SApp : App {
 		img = gettexdata<float>(tex, GL_RED, GL_FLOAT);
 		img = ::to01(img);
 		sw::timeit("restore avg", [&]() {
-			float sum = std::accumulate(img.begin(), img.end(), 0.0f);
+			float sum = ::accumulate(img.begin(), img.end(), 0.0f);
 			float avg = sum / (float)img.area;
 			forxy(img)
 			{
@@ -167,7 +192,7 @@ struct SApp : App {
 		return img;
 	}
 	Img multiscaleApply(Img src, function<Img(Img)> func) {
-		int size = min(src.w, src.h);
+		int size = std::min(src.w, src.h);
 		auto state = src.clone();
 		vector<Img> scales;
 		auto filter = ci::FilterGaussian();
@@ -178,7 +203,7 @@ struct SApp : App {
 			size /= 2;
 		}
 		vector<Img> origScales = scales;
-		foreach(auto & s, origScales) s = s.clone();
+		for(auto & s : origScales) s = s.clone();
 		int lastLevel = 0;
 		for (int i = scales.size() - 1; i >= lastLevel; i--) {
 			//texs[i] = gtex(scales[i]);
@@ -189,11 +214,11 @@ struct SApp : App {
 			sw::timeit("::map", [&]() {
 #pragma omp parallel for
 				for (int j = 0; j < diff.area; j++) {
-					diff(j) = transformed(j) - thisOrigScale(j);
+					diff.data[j] = transformed.data[j] - thisOrigScale.data[j];
 				}
 				});
 			float w = 1.0f - pow(i / float(scales.size() - 1), 10.0f);
-			w = max(0.0f, min(1.0f, w));
+			w = std::max(0.0f, std::min(1.0f, w));
 			sw::timeit("2 loops", [&]() {
 				forxy(diff) {
 					diff(p) *= w;
@@ -204,7 +229,7 @@ struct SApp : App {
 				sw::timeit("::map", [&]() {
 #pragma omp parallel for
 					for (int j = 0; j < transformed.area; j++) {
-						scales[lastLevel](j) = thisOrigScale(j) + diff(j);//.clone();
+						scales[lastLevel].data[j] = thisOrigScale.data[j] + diff.data[j];//.clone();
 					}
 					});
 				break;
@@ -250,12 +275,12 @@ struct SApp : App {
 			else {
 				vector<gl::TextureRef> ordered;
 				do {
-					foreach(auto & pair, texs) {
+					for(auto & pair : texs) {
 						ordered.push_back(pair.second);
 					}
 				} while (0);
 
-				float my = max(0.0f, min(1.0f, mouseY));
+				float my = std::max(0.0f, std::min(1.0f, mouseY));
 				int i = (texs.size() - 1) * my;
 				auto tex = ordered[i];
 				tex->bind();
