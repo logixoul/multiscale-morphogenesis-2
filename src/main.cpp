@@ -153,9 +153,6 @@ struct SApp : App {
 		float abc = cfg2::getFloat("morphogenesis", .02, 0.068, 20, 1.92, ImGuiSliderFlags_Logarithmic);
 		float contrastizeFactor = cfg2::getFloat("contrastizeFactor", 1.f, 0.01, 100, 0.012, ImGuiSliderFlags_Logarithmic);
 		float blendWeaken = cfg2::getFloat("blendWeaken", 0.01f, 0.1, .499, .49f);
-		//static float abc=1.92;  ImGui::DragFloat("abc", &abc, 0.02, 0.068, 20, "%.3f", ImGuiSliderFlags_Logarithmic);
-		//static float contrastizeFactor=0.012;  ImGui::DragFloat("contrastizeFactor", &contrastizeFactor, 1.f, 0.01, 100, "%.3f", ImGuiSliderFlags_Logarithmic);
-		//static float blendWeaken = .49f;  ImGui::DragFloat("blendWeaken", &blendWeaken, 0.01f, 0.1, .499, "%.3f");
 		
 		auto tex = gtex(img);
 		gl::TextureRef gradientsTex;
