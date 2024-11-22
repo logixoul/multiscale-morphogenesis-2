@@ -56,6 +56,25 @@ inline Array2D<float> to01_Cut(Array2D<float> in) {
 	return result;
 }
 
+gl::TextureRef get_gradients_tex_v2(gl::TextureRef src, GLuint wrapS, GLuint wrapT) {
+	GPU_SCOPE("get_gradients_tex");
+	glActiveTexture(GL_TEXTURE0);
+	::bindTexture(src);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrapS);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrapT);
+	return shade2(src,
+		"	float srcL=fetch1(tex,tc+tsize*vec2(-1.0,0.0));"
+		"	float srcR=fetch1(tex,tc+tsize*vec2(1.0,0.0));"
+		"	float srcT=fetch1(tex,tc+tsize*vec2(0.0,-1.0));"
+		"	float srcB=fetch1(tex,tc+tsize*vec2(0.0,1.0));"
+		"	float dx=(srcR-srcL)/2.0;"
+		"	float dy=(srcB-srcT)/2.0;"
+		"	_out.xy=vec2(dx,dy);"
+		,
+		ShadeOpts().ifmt(GL_RG16F)
+	);
+}
+
 // baseline 7fps
 // now 9fps
 
@@ -67,7 +86,6 @@ int sy = 256;
 Array2D<float> img(sx, sy);
 bool pause2 = false;
 std::map<int, gl::TextureRef> texs;
-auto imgadd_accum = Array2D<float>(sx, sy);
 
 // I have a `restoring_functionality_after_merge` branch where I attempt to merge supportlib from Tonemaster
 
@@ -126,22 +144,19 @@ struct SApp : App {
 		forxy(img) {
 			img(p) = std::rand()/float(RAND_MAX);
 		}
-		forxy(imgadd_accum) {
-			imgadd_accum(p) = 0.0f;
-		}
 	}
 
 	typedef Array2D<float> Img;
 	static Img update_1_scale(Img aImg)
 	{
 		auto img = aImg.clone();
-		static float abc=1.854;  ImGui::DragFloat("abc", &abc, 0.02, 0.068, 20, "%.3f", ImGuiSliderFlags_Logarithmic);
-		static float contrastizeFactor=0.558;  ImGui::DragFloat("contrastizeFactor", &contrastizeFactor, 1.f, 0.1, 100, "%.3f", ImGuiSliderFlags_Logarithmic);
-		static float blendWeaken = .44f;  ImGui::DragFloat("blendWeaken", &blendWeaken, 0.01f, 0.1, .49, "%.3f");
+		static float abc=1.92;  ImGui::DragFloat("abc", &abc, 0.02, 0.068, 20, "%.3f", ImGuiSliderFlags_Logarithmic);
+		static float contrastizeFactor=0.012;  ImGui::DragFloat("contrastizeFactor", &contrastizeFactor, 1.f, 0.01, 100, "%.3f", ImGuiSliderFlags_Logarithmic);
+		static float blendWeaken = .49f;  ImGui::DragFloat("blendWeaken", &blendWeaken, 0.01f, 0.1, .499, "%.3f");
 		
 		auto tex = gtex(img);
 		gl::TextureRef gradientsTex;
-		gradientsTex = get_gradients_tex(tex);
+		gradientsTex = get_gradients_tex_v2(tex, GL_REPEAT, GL_CLAMP_TO_EDGE);
 		tex = shade2(tex, gradientsTex,
 			"vec2 grad = fetch2(tex2);"
 			"vec2 dir = perpLeft(safeNormalized(grad));"
@@ -163,10 +178,11 @@ struct SApp : App {
 			img(p) = lerp(img(p), imgb(p), .8f);
 		}*/
 		auto texb = tex;
-		texb = gauss3tex(texb);
-		texb = gauss3tex(texb);
-		texb = gauss3tex(texb);
-
+		for (int i = 0; i < 3; i++) {
+			texb->setWrap(GL_REPEAT, GL_CLAMP_TO_EDGE);
+			texb = gauss3tex(texb);
+		}
+		
 		tex = shade2(tex, texb,
 			"float f = fetch1();"
 			"float fb = fetch1(tex2);"
