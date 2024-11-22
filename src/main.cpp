@@ -135,8 +135,9 @@ struct SApp : App {
 	static Img update_1_scale(Img aImg)
 	{
 		auto img = aImg.clone();
-		static float abc=0.68;  ImGui::DragFloat("abc", &abc, 0.2, 0.68, 2, "%.3f", ImGuiSliderFlags_Logarithmic);
-		static float contrastizeFactor=2.58;  ImGui::DragFloat("contrastizeFactor", &contrastizeFactor, 1.f, 0.1, 100, "%.3f", ImGuiSliderFlags_Logarithmic);
+		static float abc=1.854;  ImGui::DragFloat("abc", &abc, 0.02, 0.068, 20, "%.3f", ImGuiSliderFlags_Logarithmic);
+		static float contrastizeFactor=0.558;  ImGui::DragFloat("contrastizeFactor", &contrastizeFactor, 1.f, 0.1, 100, "%.3f", ImGuiSliderFlags_Logarithmic);
+		static float blendWeaken = .44f;  ImGui::DragFloat("blendWeaken", &blendWeaken, 0.01f, 0.1, .49, "%.3f");
 		
 		auto tex = gtex(img);
 		gl::TextureRef gradientsTex;
@@ -180,7 +181,17 @@ struct SApp : App {
 		{
 			img(p) += .5f - avg;
 		}
-		
+		forxy(img) {
+			float floatY = p.y / (float)img.h;
+			floatY = glm::mix(blendWeaken, 1.0f - blendWeaken, floatY);
+			floatY = std::max(0.0f, std::min(1.0f, floatY));
+			if (floatY < .5) {
+				img(p) *= floatY * 2;
+			}
+			else {
+				img(p) = glm::mix(img(p), 1.0f, (floatY - 0.5f) * 2);
+			}
+		}
 		forxy(img) {
 			auto& c = img(p);
 			c = ci::constrain(c, 0.0f, 1.0f);
