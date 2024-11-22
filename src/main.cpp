@@ -11,6 +11,8 @@
 
 #include "stefanfw.h"
 
+#include "CrossThreadCallQueue.h"
+
 typedef WrapModes::GetWrapped WrapMode;
 
 Array2D<vec3> resize(Array2D<vec3> src, ivec2 dstSize, const ci::FilterBase& filter)
@@ -43,8 +45,8 @@ inline Array2D<float> to01_Cut(Array2D<float> in) {
 	std::sort(tmp.begin(), tmp.end());
 	//float div = constrain<float>(mouseX * 100, 1, 100);
 	float div = 100;
-	float minn = tmp.data[tmp.area / div];
-	float maxx = tmp.data[tmp.area - 1 - tmp.area / div];
+	float minn = tmp.data[int(tmp.area / div)];
+	float maxx = tmp.data[int(tmp.area - 1 - tmp.area / div)];
 	auto result = in.clone();
 	forxy(result) {
 		result(p) -= minn;
@@ -116,7 +118,7 @@ struct SApp : App {
 	}
 	void reset() {
 		forxy(img) {
-			img(p) = std::rand()/RAND_MAX;
+			img(p) = std::rand()/float(RAND_MAX);
 		}
 		forxy(imgadd_accum) {
 			imgadd_accum(p) = 0.0f;
@@ -290,6 +292,7 @@ struct SApp : App {
 			});
 	}
 };
+CrossThreadCallQueue* gMainThreadCallQueue;
 
 CINDER_APP(SApp, RendererGl(),
 	[&](ci::app::App::Settings* settings)
