@@ -219,7 +219,7 @@ struct SApp : App {
 		auto state = src.clone();
 		vector<Img> scales;
 		auto filter = ci::FilterGaussian();
-		while (size > 1)
+		while (size > 16)
 		{
 			scales.push_back(state);
 			state = ::resize(state, state.Size() / 2, filter);
@@ -279,8 +279,8 @@ struct SApp : App {
 		if (pause2) {
 			return;
 		}
-		//img = multiscaleApply(img, update_1_scale);
-		img = update_1_scale(img);
+		img = multiscaleApply(img, [this](auto arg) { return update_1_scale(arg); });
+		//img = update_1_scale(img);
 	}
 
 	void stefanDraw()
