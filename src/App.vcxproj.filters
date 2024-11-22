@@ -1,0 +1,121 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="precompiled.cpp" />
+    <ClCompile Include="Array2D_imageProc.cpp">
+      <Filter>lxlib</Filter>
+    </ClCompile>
+    <ClCompile Include="cfg1.cpp">
+      <Filter>lxlib</Filter>
+    </ClCompile>
+    <ClCompile Include="colorspaces.cpp">
+      <Filter>lxlib</Filter>
+    </ClCompile>
+    <ClCompile Include="ConcurrentQueue.cpp">
+      <Filter>lxlib</Filter>
+    </ClCompile>
+    <ClCompile Include="CrossThreadCallQueue.cpp">
+      <Filter>lxlib</Filter>
+    </ClCompile>
+    <ClCompile Include="cvstuff.cpp">
+      <Filter>lxlib</Filter>
+    </ClCompile>
+    <ClCompile Include="easyfft.cpp">
+      <Filter>lxlib</Filter>
+    </ClCompile>
+    <ClCompile Include="events.cpp">
+      <Filter>lxlib</Filter>
+    </ClCompile>
+    <ClCompile Include="gpgpu.cpp">
+      <Filter>lxlib</Filter>
+    </ClCompile>
+    <ClCompile Include="gpuBlur2_5.cpp">
+      <Filter>lxlib</Filter>
+    </ClCompile>
+    <ClCompile Include="MyTimer.cpp">
+      <Filter>lxlib</Filter>
+    </ClCompile>
+    <ClCompile Include="shade.cpp">
+      <Filter>lxlib</Filter>
+    </ClCompile>
+    <ClCompile Include="simplexnoise.cpp">
+      <Filter>lxlib</Filter>
+    </ClCompile>
+    <ClCompile Include="stefanfw.cpp">
+      <Filter>lxlib</Filter>
+    </ClCompile>
+    <ClCompile Include="stuff.cpp">
+      <Filter>lxlib</Filter>
+    </ClCompile>
+    <ClCompile Include="sw.cpp">
+      <Filter>lxlib</Filter>
+    </ClCompile>
+    <ClCompile Include="TextureCache.cpp">
+      <Filter>lxlib</Filter>
+    </ClCompile>
+    <ClCompile Include="util.cpp">
+      <Filter>lxlib</Filter>
+    </ClCompile>
+    <ClCompile Include="cfg2.cpp" />
+    <ClCompile Include="CinderImGui.cpp" />
+    <ClCompile Include="IntegratedConsole.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="precompiled.h" />
+    <ClInclude Include="easyfft.h">
+      <Filter>lxlib</Filter>
+    </ClInclude>
+    <ClInclude Include="gpgpu.h">
+      <Filter>lxlib</Filter>
+    </ClInclude>
+    <ClInclude Include="gpuBlur2_5.h">
+      <Filter>lxlib</Filter>
+    </ClInclude>
+    <ClInclude Include="shade.h">
+      <Filter>lxlib</Filter>
+    </ClInclude>
+    <ClInclude Include="simplexnoise.h">
+      <Filter>lxlib</Filter>
+    </ClInclude>
+    <ClInclude Include="stefanfw.h">
+      <Filter>lxlib</Filter>
+    </ClInclude>
+    <ClInclude Include="stuff.h">
+      <Filter>lxlib</Filter>
+    </ClInclude>
+    <ClInclude Include="sw.h">
+      <Filter>lxlib</Filter>
+    </ClInclude>
+    <ClInclude Include="TextureCache.h">
+      <Filter>lxlib</Filter>
+    </ClInclude>
+    <ClInclude Include="util.h">
+      <Filter>lxlib</Filter>
+    </ClInclude>
+    <ClInclude Include="cfg2.h" />
+    <ClInclude Include="CinderImGui.h" />
+    <ClInclude Include="CinderImGuiConfig.h" />
+    <ClInclude Include="IntegratedConsole.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="hcl_lib.fs">
+      <Filter>lxlib</Filter>
+    </None>
+    <None Include="simplexnoise3d.fs.glsl">
+      <Filter>lxlib</Filter>
+    </None>
+    <None Include="stuff.fs">
+      <Filter>lxlib</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="OldCode.txt" />
+    <Text Include="..\vcpkg-notes.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="lxlib">
+      <UniqueIdentifier>{84946c29-52d8-4217-be6f-d040dd19abdb}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

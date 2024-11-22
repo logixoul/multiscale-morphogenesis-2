@@ -1,0 +1,13 @@
+CMake projects should use: "-DCMAKE_TOOLCHAIN_FILE=C:/Users/logix/Desktop/code_/libs/misc/vcpkg/scripts/buildsystems/vcpkg.cmake"
+
+All MSBuild C++ projects can now #include any installed libraries. Linking will be handled automatically. Installing new libraries will make them instantly available.
+
+=============
+
+https://learn.microsoft.com/en-us/vcpkg/get_started/get-started-msbuild?pivots=shell-cmd#1---set-up-vcpkg
+
+in dev command prompt:
+
+vcpkg new --application
+vcpkg add port imgui
+vcpkg add port imgui[opengl3-binding]

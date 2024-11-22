@@ -1,0 +1,3 @@
+[submodule "src/lxlib"]
+	path = src/lxlib
+	url = https://github.com/logixoul/lxlib
