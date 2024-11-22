@@ -306,8 +306,13 @@ struct SApp : App {
 					"float val = fetch1();"
 					"float fw = fwidth(val);"
 					//"val = smoothstep(0.5-fw/2, 0.5+fw/2, val);"
-					"_out.r = val;");
-				tex = redToLuminance(tex);
+					// this is taken from https://www.shadertoy.com/view/Mld3Rn
+					"vec3 fire = vec3(min(val * 1.5, 1.), pow(val, 2.5), pow(val, 12.)); "
+
+					"_out.rgb = fire;",
+					ShadeOpts().ifmt(GL_RGB16F)
+					);
+				//tex = redToLuminance(tex);
 				//tex->setMagFilter(GL_NEAREST);
 				gl::draw(tex, getWindowBounds());
 			}
