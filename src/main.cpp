@@ -5,7 +5,7 @@
 #include "stuff.h"
 #include "Array2D_imageProc.h"
 #include "gpgpu.h"
-#include "cfg1.h"
+#include "cfg2.h"
 #include "sw.h"
 #include "gpuBlur2_5.h"
 
@@ -95,15 +95,17 @@ struct SApp : App {
 		disableGLReadClamp();
 		stefanfw::eventHandler.subscribeToEvents(*this);
 
-
+		cfg2::init();
 	}
 
 	void update()
 	{
+		cfg2::begin();
 		stefanfw::beginFrame();
 		stefanUpdate();
 		stefanDraw();
 		stefanfw::endFrame();
+		cfg2::end();
 	}
 	void keyDown(KeyEvent e)
 	{
@@ -114,6 +116,10 @@ struct SApp : App {
 		if (keys['r'])
 		{
 			reset();
+		}
+		if (e.getChar() == 'd')
+		{
+			//cfg2::params->isVisible() ? cfg2::params->hide() : cfg2::params->show();
 		}
 	}
 	void reset() {
@@ -129,13 +135,9 @@ struct SApp : App {
 	static Img update_1_scale(Img aImg)
 	{
 		auto img = aImg.clone();
-		auto abc = cfg1::getOpt("abc", 10.0f,
-			[&]() { return keys['a']; },
-			[&]() { return niceExpRangeX(mouseX, .05f, 1000.0f); });
-		auto contrastizeFactor = cfg1::getOpt("contrastizeFactor", 1.0f,
-			[&]() { return keys['c']; },
-			[&]() { return niceExpRangeX(mouseX, .05f, 1000.0f); });
-
+		static float abc=1.634;  ImGui::DragFloat("abc", &abc, 1.f, 0.1, 100, "%.3f", ImGuiSliderFlags_Logarithmic);
+		static float contrastizeFactor=2.58;  ImGui::DragFloat("contrastizeFactor", &contrastizeFactor, 1.f, 0.1, 100, "%.3f", ImGuiSliderFlags_Logarithmic);
+		
 		auto tex = gtex(img);
 		gl::TextureRef gradientsTex;
 		gradientsTex = get_gradients_tex(tex);
@@ -159,32 +161,33 @@ struct SApp : App {
 		forxy(img) {
 			img(p) = lerp(img(p), imgb(p), .8f);
 		}*/
-		auto texb = gauss3tex(tex);
+		auto texb = tex;
+		texb = gauss3tex(texb);
+		texb = gauss3tex(texb);
+		texb = gauss3tex(texb);
+
 		tex = shade2(tex, texb,
 			"float f = fetch1();"
 			"float fb = fetch1(tex2);"
-			"_out.r = mix(f, fb, .2f);"
+			"_out.r = mix(f, fb, .8f);"
 		);
 		img = gettexdata<float>(tex, GL_RED, GL_FLOAT);
 		img = ::to01(img);
-		sw::timeit("restore avg", [&]() {
-			float sum = ::accumulate(img.begin(), img.end(), 0.0f);
-			float avg = sum / (float)img.area;
-			forxy(img)
-			{
-				img(p) += .5f - avg;
-			}
-			});
-		sw::timeit("threshold", [&]() {
-			forxy(img) {
-				auto& c = img(p);
-				c = ci::constrain(c, 0.0f, 1.0f);
-				auto c2 = 3.0f * c * c - 2.0f * c * c * c;
-				c = mix(c, c2, contrastizeFactor);
-			}
-			});
-		//forxy(img) img(p)=max(0.0f, min(1.0f, img(p)));
-		//mm(img, "img");
+
+		float sum = ::accumulate(img.begin(), img.end(), 0.0f);
+		float avg = sum / (float)img.area;
+		forxy(img)
+		{
+			img(p) += .5f - avg;
+		}
+		
+		forxy(img) {
+			auto& c = img(p);
+			c = ci::constrain(c, 0.0f, 1.0f);
+			auto c2 = 3.0f * c * c - 2.0f * c * c * c;
+			c = mix(c, c2, contrastizeFactor);
+			c = ci::constrain(c, 0.0f, 1.0f);
+		}
 		return img;
 	}
 	Img multiscaleApply(Img src, function<Img(Img)> func) {
@@ -247,7 +250,7 @@ struct SApp : App {
 			return;
 		}
 		//img = multiscaleApply(img, update_1_scale);
-		//img = update_1_scale(img);
+		img = update_1_scale(img);
 	}
 
 	void stefanDraw()
