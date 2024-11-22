@@ -60,7 +60,7 @@ inline Array2D<float> to01_Cut(Array2D<float> in) {
 // now 9fps
 
 //int wsx=800, wsy=800.0*(800.0/1280.0);
-int wsx = 768, wsy = 768;
+int wsx = 700, wsy = 700;
 //int scale=2;
 int sx = 256;
 int sy = 256;
@@ -129,48 +129,42 @@ struct SApp : App {
 	static Img update_1_scale(Img aImg)
 	{
 		auto img = aImg.clone();
-		auto abc = cfg1::getOpt("abc", 1.0f,
+		auto abc = cfg1::getOpt("abc", 10.0f,
 			[&]() { return keys['a']; },
 			[&]() { return niceExpRangeX(mouseX, .05f, 1000.0f); });
-		auto contrastizeFactor = cfg1::getOpt("contrastizeFactor", 0.0f,
+		auto contrastizeFactor = cfg1::getOpt("contrastizeFactor", 1.0f,
 			[&]() { return keys['c']; },
 			[&]() { return niceExpRangeX(mouseX, .05f, 1000.0f); });
 
 		auto tex = gtex(img);
 		gl::TextureRef gradientsTex;
-		sw::timeit("calc velocities [get_gradients]", [&]() {
-			gradientsTex = get_gradients_tex(tex);
-			});
-		sw::timeit("calc velocities [the rest]", [&]() {
-			tex = shade2(tex, gradientsTex,
-				"vec2 grad = fetch2(tex2);"
-				"vec2 dir = perpLeft(safeNormalized(grad));"
-				""
-				"float val = fetch1();"
-				"float valLeft = fetch1(tex, tc + tsize * dir);"
-				"float valRight = fetch1(tex, tc - tsize * dir);"
-				"float add = (val - (valLeft + valRight) * .5f);"
-				"_out.r = val + add * abc;"
-				, ShadeOpts().uniform("abc", abc),
-				"vec2 perpLeft(vec2 v) {"
-				"	return vec2(-v.y, v.x);"
-				"}"
-			);
-			});
-
-		sw::timeit("blur", [&]() {
-			/*auto imgb = gauss3_<float, WrapModes::GetWrapped>(img);//gaussianBlur(img, 3);
-			//img=imgb;
-			forxy(img) {
-				img(p) = lerp(img(p), imgb(p), .8f);
-			}*/
-			auto texb = gauss3tex(tex);
-			tex = shade2(tex, texb,
-				"float f = fetch1();"
-				"float fb = fetch1(tex2);"
-				"_out.r = mix(f, fb, .8f);"
-			);
-			});
+		gradientsTex = get_gradients_tex(tex);
+		tex = shade2(tex, gradientsTex,
+			"vec2 grad = fetch2(tex2);"
+			"vec2 dir = perpLeft(safeNormalized(grad));"
+			""
+			"float val = fetch1();"
+			"float valLeft = fetch1(tex, tc + tsize * dir);"
+			"float valRight = fetch1(tex, tc - tsize * dir);"
+			"float add = (val - (valLeft + valRight) * .5f);"
+			"_out.r = val + add * abc;"
+			, ShadeOpts().uniform("abc", abc),
+			"vec2 perpLeft(vec2 v) {"
+			"	return vec2(-v.y, v.x);"
+			"}"
+		);
+		
+		/*auto imgb = gauss3_<float, WrapModes::GetWrapped>(img);//gaussianBlur(img, 3);
+		//img=imgb;
+		forxy(img) {
+			img(p) = lerp(img(p), imgb(p), .8f);
+		}*/
+		auto texb = gauss3tex(tex);
+		tex = shade2(tex, texb,
+			"float f = fetch1();"
+			"float fb = fetch1(tex2);"
+			"_out.r = mix(f, fb, .2f);"
+		);
 		img = gettexdata<float>(tex, GL_RED, GL_FLOAT);
 		img = ::to01(img);
 		sw::timeit("restore avg", [&]() {
@@ -252,7 +246,7 @@ struct SApp : App {
 		if (pause2) {
 			return;
 		}
-		img = multiscaleApply(img, update_1_scale);
+		//img = multiscaleApply(img, update_1_scale);
 		//img = update_1_scale(img);
 	}
 
@@ -261,18 +255,21 @@ struct SApp : App {
 		gl::clear(Color(0, 0, 0));
 		cout << "frame# " << getElapsedFrames() << endl;
 
-		gl::setMatricesWindowPersp(vec2(sx, sy), 90.0f, 1.0f, 1000.0f, false);
-		//gl::setMatricesWindow(vec2(sx, sy), false);
-		//gl::clearDepth(0.0f);
+		//gl::setMatricesWindowPersp(vec2(sx, sy), 90.0f, 1.0f, 1000.0f, false);
+		gl::setMatricesWindow(vec2(wsx, wsy), false);
+		gl::clearDepth(0.0f);
 		gl::clear(ColorA::black(), true);
-		//gl::disableDepthRead();
-		gl::enableDepth();
+		gl::disableDepthRead();
+		//gl::enableDepth();
+
 
 		sw::timeit("draw", [&]() {
 			if (1) {
 				//renderer.render(img);
 				auto tex = gtex(img);
-				gl::draw(redToLuminance(tex), getWindowBounds());
+				tex = redToLuminance(tex);
+				tex->setMagFilter(GL_NEAREST);
+				gl::draw(tex, getWindowBounds());
 			}
 			else {
 				vector<gl::TextureRef> ordered;
