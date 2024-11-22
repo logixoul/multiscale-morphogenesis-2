@@ -46,7 +46,7 @@ namespace stefanfw {
 	}
 
 	void endFrame() {
-		sw::endFrame();
+		//sw::endFrame();
 		TimerManager::update();
 	}
 

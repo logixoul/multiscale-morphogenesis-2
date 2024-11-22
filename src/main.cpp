@@ -187,7 +187,7 @@ struct SApp : App {
 			"_out.r = mix(f, fb, .8f);"
 		);
 		img = gettexdata<float>(tex, GL_RED, GL_FLOAT);
-		img = ::to01_Cut(img);
+		img = ::to01(img);
 
 		float sum = ::accumulate(img.begin(), img.end(), 0.0f);
 		float avg = sum / (float)img.area;
@@ -241,7 +241,7 @@ struct SApp : App {
 					diff.data[j] = transformed.data[j] - thisOrigScale.data[j];
 				}
 				});
-			float w = 1.0f - pow(i / float(scales.size() - 1), 10.0f);
+			float w = 1.0f - pow(i / float(scales.size() - 1), weightFactor);
 			w = std::max(0.0f, std::min(1.0f, w));
 			//float w = exp(-3+6*i / float(scales.size() - 1));
 			sw::timeit("2 loops", [&]() {
@@ -273,10 +273,12 @@ struct SApp : App {
 	float abc;
 	float contrastizeFactor;
 	float blendWeaken;
+	float weightFactor;
 	void stefanUpdate() {
 		abc = cfg2::getFloat("morphogenesis", .02, 0.068, 20, 2.945, ImGuiSliderFlags_Logarithmic);
 		contrastizeFactor = cfg2::getFloat("contrastizeFactor", 1.f, 0.01, 100, 0.525, ImGuiSliderFlags_Logarithmic);
 		blendWeaken = cfg2::getFloat("blendWeaken", 0.01f, 0.1, .499, .389f);
+		weightFactor = cfg2::getFloat("weightFactor", 0.1f, 0.1, 30, 10, ImGuiSliderFlags_Logarithmic);
 
 		if (pause2) {
 			return;
@@ -344,5 +346,5 @@ CINDER_APP(SApp, RendererGl(),
 	[&](ci::app::App::Settings* settings)
 	{
 		//bool developer = (bool)ifstream(getAssetPath("developer"));
-		settings->setConsoleWindowEnabled(true);
+		//settings->setConsoleWindowEnabled(true);
 	})
