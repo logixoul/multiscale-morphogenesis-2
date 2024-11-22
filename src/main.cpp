@@ -135,7 +135,7 @@ struct SApp : App {
 	static Img update_1_scale(Img aImg)
 	{
 		auto img = aImg.clone();
-		static float abc=1.634;  ImGui::DragFloat("abc", &abc, 1.f, 0.1, 100, "%.3f", ImGuiSliderFlags_Logarithmic);
+		static float abc=0.68;  ImGui::DragFloat("abc", &abc, 0.2, 0.68, 2, "%.3f", ImGuiSliderFlags_Logarithmic);
 		static float contrastizeFactor=2.58;  ImGui::DragFloat("contrastizeFactor", &contrastizeFactor, 1.f, 0.1, 100, "%.3f", ImGuiSliderFlags_Logarithmic);
 		
 		auto tex = gtex(img);
