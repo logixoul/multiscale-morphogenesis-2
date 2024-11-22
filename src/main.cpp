@@ -187,7 +187,7 @@ struct SApp : App {
 			"_out.r = mix(f, fb, .8f);"
 		);
 		img = gettexdata<float>(tex, GL_RED, GL_FLOAT);
-		img = ::to01(img);
+		img = ::to01_Cut(img);
 
 		float sum = ::accumulate(img.begin(), img.end(), 0.0f);
 		float avg = sum / (float)img.area;
@@ -302,13 +302,17 @@ struct SApp : App {
 			if (1) {
 				//renderer.render(img);
 				auto tex = gtex(img);
-				tex = shade2(tex,
+				auto grads = ::get_gradients_tex(tex);
+				tex = shade2(tex, grads,
 					"float val = fetch1();"
 					"float fw = fwidth(val);"
 					//"val = smoothstep(0.5-fw/2, 0.5+fw/2, val);"
 					// this is taken from https://www.shadertoy.com/view/Mld3Rn
 					"vec3 fire = vec3(min(val * 1.5, 1.), pow(val, 2.5), pow(val, 12.)); "
-
+					"float der = fetch2(tex2).y;"
+					"if(der > 0.03 && der < 0.2 && val > 0.1) der = der * 15.0 + .1;"
+					"der = max(0, der);"
+					//"fire += der;"
 					"_out.rgb = fire;",
 					ShadeOpts().ifmt(GL_RGB16F)
 					);
