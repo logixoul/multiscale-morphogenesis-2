@@ -147,12 +147,9 @@ struct SApp : App {
 	}
 
 	typedef Array2D<float> Img;
-	static Img update_1_scale(Img aImg)
+	Img update_1_scale(Img aImg)
 	{
 		auto img = aImg.clone();
-		float abc = cfg2::getFloat("morphogenesis", .02, 0.068, 20, 1.92, ImGuiSliderFlags_Logarithmic);
-		float contrastizeFactor = cfg2::getFloat("contrastizeFactor", 1.f, 0.01, 100, 0.012, ImGuiSliderFlags_Logarithmic);
-		float blendWeaken = cfg2::getFloat("blendWeaken", 0.01f, 0.1, .499, .49f);
 		
 		auto tex = gtex(img);
 		gl::TextureRef gradientsTex;
@@ -271,8 +268,14 @@ struct SApp : App {
 		}
 		return scales[lastLevel];
 	}
-
+	float abc;
+	float contrastizeFactor;
+	float blendWeaken;
 	void stefanUpdate() {
+		abc = cfg2::getFloat("morphogenesis", .02, 0.068, 20, 1.92, ImGuiSliderFlags_Logarithmic);
+		contrastizeFactor = cfg2::getFloat("contrastizeFactor", 1.f, 0.01, 100, 0.012, ImGuiSliderFlags_Logarithmic);
+		blendWeaken = cfg2::getFloat("blendWeaken", 0.01f, 0.1, .499, .49f);
+
 		if (pause2) {
 			return;
 		}
