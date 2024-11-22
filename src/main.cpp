@@ -162,6 +162,7 @@ struct SApp : App {
 			"float valLeft = fetch1(tex, tc + tsize * dir);"
 			"float valRight = fetch1(tex, tc - tsize * dir);"
 			"float add = (val - (valLeft + valRight) * .5f);"
+			"if(add < 0.0) add = 0;"
 			"_out.r = val + add * abc;"
 			, ShadeOpts().uniform("abc", abc),
 			"vec2 perpLeft(vec2 v) {"
@@ -219,7 +220,7 @@ struct SApp : App {
 		auto state = src.clone();
 		vector<Img> scales;
 		auto filter = ci::FilterGaussian();
-		while (size > 16)
+		while (size > 1)
 		{
 			scales.push_back(state);
 			state = ::resize(state, state.Size() / 2, filter);
@@ -242,6 +243,7 @@ struct SApp : App {
 				});
 			float w = 1.0f - pow(i / float(scales.size() - 1), 10.0f);
 			w = std::max(0.0f, std::min(1.0f, w));
+			//float w = exp(-3+6*i / float(scales.size() - 1));
 			sw::timeit("2 loops", [&]() {
 				forxy(diff) {
 					diff(p) *= w;
@@ -272,9 +274,9 @@ struct SApp : App {
 	float contrastizeFactor;
 	float blendWeaken;
 	void stefanUpdate() {
-		abc = cfg2::getFloat("morphogenesis", .02, 0.068, 20, 1.92, ImGuiSliderFlags_Logarithmic);
-		contrastizeFactor = cfg2::getFloat("contrastizeFactor", 1.f, 0.01, 100, 0.012, ImGuiSliderFlags_Logarithmic);
-		blendWeaken = cfg2::getFloat("blendWeaken", 0.01f, 0.1, .499, .49f);
+		abc = cfg2::getFloat("morphogenesis", .02, 0.068, 20, 2.945, ImGuiSliderFlags_Logarithmic);
+		contrastizeFactor = cfg2::getFloat("contrastizeFactor", 1.f, 0.01, 100, 0.912, ImGuiSliderFlags_Logarithmic);
+		blendWeaken = cfg2::getFloat("blendWeaken", 0.01f, 0.1, .499, .389f);
 
 		if (pause2) {
 			return;
@@ -300,8 +302,13 @@ struct SApp : App {
 			if (1) {
 				//renderer.render(img);
 				auto tex = gtex(img);
+				tex = shade2(tex,
+					"float val = fetch1();"
+					"float fw = fwidth(val);"
+					//"val = smoothstep(0.5-fw/2, 0.5+fw/2, val);"
+					"_out.r = val;");
 				tex = redToLuminance(tex);
-				tex->setMagFilter(GL_NEAREST);
+				//tex->setMagFilter(GL_NEAREST);
 				gl::draw(tex, getWindowBounds());
 			}
 			else {
