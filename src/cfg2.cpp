@@ -28,15 +28,15 @@ template<class T> T& getOpt_Base(string const& name, T defaultValue) {
 	return m[name];
 }
 
-/*int cfg2::getInt(string const& name, int min, int max, int defaultValue, ImGuiSliderFlags flags) {
+int cfg2::getInt(string const& name, int min, int max, int defaultValue, ImGuiSliderFlags flags) {
 	auto& ref = getOpt_Base<int>(name, defaultValue);
 	ImGui::DragInt(name.c_str(), &ref, 1.0f, min, max, "%d", flags);
 	return ref;
 }
 
-float cfg2::getFloat(string const& name, float min, float max, float defaultValue, ImGuiSliderFlags flags) {
+float cfg2::getFloat(string const& name, float speed, float min, float max, float defaultValue, ImGuiSliderFlags flags) {
 	auto& ref = getOpt_Base<float>(name, defaultValue);
-	ImGui::DragFloat(name.c_str(), &ref, min, max, "%d", flags);
+	ImGui::DragFloat(name.c_str(), &ref, speed, min, max, "%.3f", flags);
 	return ref;
 }
 bool cfg2::getBool(string const& name, bool defaultValue) {
@@ -44,4 +44,3 @@ bool cfg2::getBool(string const& name, bool defaultValue) {
 	ImGui::Checkbox(name.c_str(), &ref);
 	return ref;
 }
-*/
