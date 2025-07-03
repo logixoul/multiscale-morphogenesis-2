@@ -52,7 +52,9 @@ auto fragShader = CI_GLSL(150,
 		vec3 N = normalize(Normal);
 		float lambert = max(0.0, dot(N, LightPos));
 		//float specular = pow(max(0.0, dot(reflect(-LightPos, N), V)), 16.0);
-		vec3 specular = texture(uCubeMapTex, reflect(-LightPos, N)).rgb;
+		vec3 specular = texture(uCubeMapTex, reflect(V, N)).rgb;
+		specular = vec3(dot(specular, vec3(0.2126, 0.7152, 0.0722))); // Convert to grayscale
+		
 
 		float fresnelBase = 0.1; // reflectance at normal incidence (F₀)
 		float fresnel = fresnelBase + (1.0 - fresnelBase) * pow(1.0 - max(dot(N, V), 0.0), 5.0);
