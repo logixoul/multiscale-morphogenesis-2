@@ -1,4 +1,4 @@
-#include "precompiled.h"
+﻿#include "precompiled.h"
 //#include "ciextra.h"
 #include "util.h"
 //#include "shade.h"
@@ -15,6 +15,7 @@
 
 auto vertShader = CI_GLSL(150,
 	uniform mat4 ciModelViewProjection;
+	uniform mat4 ciModelView;
 	uniform mat3 ciNormalMatrix;
 
 	in vec4 ciPosition;
@@ -22,11 +23,19 @@ auto vertShader = CI_GLSL(150,
 	out lowp vec4 Color;
 	in vec3 ciNormal;
 	out highp vec3 Normal;
+	out highp vec3 ViewPos;
+	out highp vec3 LightPos;
 	void main(void)
 	{
 		gl_Position = ciModelViewProjection * ciPosition;
 		Color = ciColor;
 		Normal = ciNormalMatrix * ciNormal;
+
+		// Compute view-space position of the vertex (ChatGPT)
+		ViewPos = vec3(ciModelView * ciPosition);
+		const vec3 L = normalize(vec3(0, -.3, -1));
+
+		LightPos = normalize(ciNormalMatrix * L);
 	}
 );
 
@@ -34,13 +43,19 @@ auto fragShader = CI_GLSL(150,
 	out vec4 oColor;
 	in vec4 Color;
 	in vec3 Normal;
+	in highp vec3 ViewPos;
+	in highp vec3 LightPos;
 	void main(void)
 	{
-		const vec3 L = vec3(0, 0, 1);
+		vec3 V = normalize(-ViewPos); // Camera is at (0,0,0) in view space
 		vec3 N = normalize(Normal);
-		float lambert = max(0.0, dot(N, L));
-		float specular = pow(max(0.0, dot(reflect(-L, N), vec3(0, 0, 1))), 16.0);
-		oColor.rgb = Color.rgb * lambert + vec3(specular);
+		float lambert = max(0.0, dot(N, LightPos));
+		float specular = pow(max(0.0, dot(reflect(-LightPos, N), V)), 16.0);
+
+		float fresnelBase = 0.1; // reflectance at normal incidence (F₀)
+		float fresnel = fresnelBase + (1.0 - fresnelBase) * pow(1.0 - max(dot(N, V), 0.0), 5.0);
+
+		oColor.rgb = Color.rgb * lambert + vec3(specular) * fresnel*10.0;
 		oColor.a = 1.0;
 	}
 );
@@ -493,29 +508,39 @@ struct SApp : App {
 		return shade2(red, grads,
 			"float val = fetch1();"
 			"float fw = fwidth(val);"
-			//"val = smoothstep(0.5-fw/2, 0.5+fw/2, val);"
 			// this is taken from https://www.shadertoy.com/view/Mld3Rn
 			"vec3 fire = vec3(min(val * 1.5, 1.), pow(val, 2.5), pow(val, 12.)); "
-			"float der = fetch2(tex2).y;"
-			"if(der > 0.03 && der < 0.2 && val > 0.1) der = der * 15.0 + .1;"
-			"der = max(0, der);"
-			//"fire += der;"
+			"float der = fetch2(tex2).x;"
+			//"fire = createRotationMatrix(vec3(1,1,1), der * 100.0) * fire;"
 			"_out.rgb = fire;",
-			ShadeOpts().ifmt(GL_RGB16F)
+			ShadeOpts().ifmt(GL_RGB16F),
+			// from chatgpt
+			MULTILINE(
+				mat3 createRotationMatrix(vec3 axis, float radians) {
+					axis = normalize(axis);
+					float c = cos(radians);
+					float s = sin(radians);
+					float oneMinusC = 1.0 - c;
+
+					float x = axis.x;
+					float y = axis.y;
+					float z = axis.z;
+
+					return mat3(
+						c + x * x * oneMinusC, x * y * oneMinusC - z * s, x * z * oneMinusC + y * s,
+						y * x * oneMinusC + z * s, c + y * y * oneMinusC, y * z * oneMinusC - x * s,
+						z * x * oneMinusC - y * s, z * y * oneMinusC + x * s, c + z * z * oneMinusC
+					);
+				}
+			)
 		);
 	}
 	void stefanDraw()
 	{
-		//gl::clear(Color(0, 0, 0));
-		cout << "frame# " << getElapsedFrames() << endl;
-
-		//gl::setMatricesWindowPersp(vec2(sx, sy), 90.0f, 1.0f, 1000.0f, false);
 		gl::setMatricesWindow(vec2(wsx, wsy), false);
-		//gl::clearDepth(0.0f);
 		gl::clear(ColorA::black(), true);
 		gl::disableDepthRead();
-		//gl::enableDepth();
-
+		
 
 		sw::timeit("draw", [&]() {
 			if (1) {
@@ -562,4 +587,5 @@ CINDER_APP(SApp, RendererGl(),
 	{
 		//bool developer = (bool)ifstream(getAssetPath("developer"));
 		settings->setConsoleWindowEnabled(true);
+		settings->setTitle("Volcano stuffs");
 	})
