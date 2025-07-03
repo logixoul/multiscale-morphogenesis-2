@@ -45,17 +45,19 @@ auto fragShader = CI_GLSL(150,
 	in vec3 Normal;
 	in highp vec3 ViewPos;
 	in highp vec3 LightPos;
+	uniform samplerCube uCubeMapTex;
 	void main(void)
 	{
 		vec3 V = normalize(-ViewPos); // Camera is at (0,0,0) in view space
 		vec3 N = normalize(Normal);
 		float lambert = max(0.0, dot(N, LightPos));
-		float specular = pow(max(0.0, dot(reflect(-LightPos, N), V)), 16.0);
+		//float specular = pow(max(0.0, dot(reflect(-LightPos, N), V)), 16.0);
+		vec3 specular = texture(uCubeMapTex, reflect(-LightPos, N)).rgb;
 
 		float fresnelBase = 0.1; // reflectance at normal incidence (F₀)
 		float fresnel = fresnelBase + (1.0 - fresnelBase) * pow(1.0 - max(dot(N, V), 0.0), 5.0);
 
-		oColor.rgb = Color.rgb * lambert + vec3(specular) * fresnel*10.0;
+		oColor.rgb = Color.rgb * lambert + specular *fresnel*.3;
 		oColor.a = 1.0;
 	}
 );
@@ -161,9 +163,14 @@ struct SApp : App {
 	CameraUi		mCamUi;
 	gl::BatchRef	mPointsBatch;
 	gl::VboMeshRef	mVboMesh;
+	gl::TextureCubeMapRef	mCubeMap;
 	
 	void setup()
 	{
+		auto format = gl::TextureCubeMap::Format().mipmap().internalFormat(GL_RGBA16F);
+		format.setDataType(GL_FLOAT);
+		mCubeMap = gl::TextureCubeMap::create(loadImage(loadAsset("blue_photo_studio_4k.hdr")), format);
+
 
 		reset();
 		enableDenormalFlushToZero();
@@ -185,6 +192,7 @@ struct SApp : App {
 
 
 		auto shaderProg = gl::GlslProg::create(vertShader, fragShader);
+		shaderProg->uniform("uCubeMapTex", 0);
 		// * 6 because each quad is made of 2 triangles, and each triangle has 3 vertices
 		mVboMesh = gl::VboMesh::create(mWidth * mHeight * 6, GL_TRIANGLES, { gl::VboMesh::Layout().usage(GL_STATIC_DRAW).attrib(geom::POSITION, 3).attrib(geom::NORMAL, 3).attrib(geom::COLOR, 3) });
 		mPointsBatch = gl::Batch::create(mVboMesh, shaderProg);
@@ -555,6 +563,7 @@ struct SApp : App {
 
 				gl::pushMatrices();
 				gl::setMatrices(mCam);
+				gl::ScopedTextureBind texBind(mCubeMap, 0);
 				if (mPointsBatch)
 					mPointsBatch->draw();
 				gl::popMatrices();
