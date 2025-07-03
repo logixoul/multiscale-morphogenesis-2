@@ -161,9 +161,10 @@ struct SApp : App {
 		
 		auto tex = gtex(img);
 		gl::TextureRef gradientsTex;
+		//gradientsTex = get_gradients_tex_v2(tex, GL_REPEAT, GL_CLAMP_TO_EDGE);
 		gradientsTex = get_gradients_tex_v2(tex, GL_REPEAT, GL_CLAMP_TO_EDGE);
 
-		auto gradients = dl<vec2>(gradientsTex);
+		/*auto gradients = dl<vec2>(gradientsTex);
 		static const auto perpLeft = [&](vec2 v) { return vec2(-v.y, v.x); }; //correct
 		auto guidance = img;
 		auto img2 = img.clone();
@@ -182,11 +183,11 @@ struct SApp : App {
 				float add = (val - (valLeft + valRight) * .5f);
 				if (add < 0.0)
 					add = 0;
-				aaPoint<float, WrapModes::GetWrapped>(img2, p - grad * 1.0f, add * abc);
+				aaPoint<float, WrapModes::GetWrapped>(img2, p - grad, add * abc);
 				//img2(p) += add * abc;
 			}
-		}
-		/*tex = shade2(tex, gradientsTex,
+		}*/
+		tex = shade2(tex, gradientsTex,
 			"vec2 grad = fetch2(tex2);"
 			"vec2 dir = perpLeft(safeNormalized(grad));"
 			""
@@ -200,8 +201,16 @@ struct SApp : App {
 			"vec2 perpLeft(vec2 v) {"
 			"	return vec2(-v.y, v.x);"
 			"}"
-		);*/
-		tex = gtex(img2);
+		);
+		/*auto tex3 = shade2(tex, "float f = fetch1();"
+			"_out.r = f;"
+			"_out.a = 1.0;",
+			ShadeOpts().ifmt(GL_RGBA8)
+		);
+		ci::writeImage("dbg.png", tex3->createSource());
+		quit();*/
+		//quit();
+		//tex = gtex(img2);
 		auto texb = tex;
 		for (int i = 0; i < 3; i++) {
 			texb->setWrap(GL_REPEAT, GL_CLAMP_TO_EDGE);
@@ -241,7 +250,8 @@ struct SApp : App {
 		auto state = src.clone();
 		vector<Img> scales;
 		auto filter = ci::FilterGaussian();
-		while (size > 1)
+		//for(int i = 0; i< 4; i++)
+		while (size > 2)
 		{
 			scales.push_back(state);
 			state = ::resize(state, state.Size() / 2, filter);
@@ -376,5 +386,5 @@ CINDER_APP(SApp, RendererGl(),
 	[&](ci::app::App::Settings* settings)
 	{
 		//bool developer = (bool)ifstream(getAssetPath("developer"));
-		//settings->setConsoleWindowEnabled(true);
+		settings->setConsoleWindowEnabled(true);
 	})
