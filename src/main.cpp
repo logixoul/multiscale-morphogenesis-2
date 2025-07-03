@@ -136,36 +136,62 @@ struct SApp : App {
 		int mWidth = sx;
 		int mHeight = sy;
 
-		mVboMesh = gl::VboMesh::create(mWidth * mHeight * 3, GL_TRIANGLES, { gl::VboMesh::Layout().usage(GL_STATIC_DRAW).attrib(geom::POSITION, 3).attrib(geom::COLOR, 3) });
+		// * 6 because each quad is made of 2 triangles, and each triangle has 3 vertices
+		mVboMesh = gl::VboMesh::create(mWidth * mHeight * 6, GL_TRIANGLES, { gl::VboMesh::Layout().usage(GL_STATIC_DRAW).attrib(geom::POSITION, 3).attrib(geom::COLOR, 3) });
 		mPointsBatch = gl::Batch::create(mVboMesh, gl::getStockShader(gl::ShaderDef().color()));
 
 		updateData(gtex(img));
 		mCam.lookAt(vec3(mWidth / 2, 50, mHeight / 2), vec3(0));
 	}
 
+	struct VertInfo {
+		vec3 pos;
+		vec3 color;
+	};
+
+	VertInfo getVertInfo(ivec2 p, Array2D<vec3> const& rgbImg, Array2D<float> const& redImg)
+	{
+		float height = redImg(p);
+		float x = p.x - sx / 2.0f;
+		float z = p.y - sy / 2.0f;
+		VertInfo vert;
+		vert.pos = vec3(x, height * 30.0f, z);
+		vert.color = rgbImg(p);
+		return vert;
+	}
+
 	void updateData(Tex redTex)
 	{
 		auto rgbTex = redToRgb(redTex);
 		auto rgbImg = dl<vec3>(rgbTex);
+		auto redImg = dl<float>(redTex);
 		auto vertPosIter = mVboMesh->mapAttrib3f(geom::POSITION);
 		auto vertColorIter = mVboMesh->mapAttrib3f(geom::COLOR);
 
 		forxy(img) {
-			Color color(rgbImg(p).r, rgbImg(p).g, rgbImg(p).b);
-			float height;
-			const float muteColor = 0.2f;
+			if(p.x == img.w-1 || p.y == img.h-1)
+				continue;
+			float height = redImg(p);
 
-			height = dot(color, Color(0.3333f, 0.3333f, 0.3333f));
-				
 			// the x and the z coordinates correspond to the pixel's x & y
 			float x = p.x - sx / 2.0f;
 			float z = p.y - sy / 2.0f;
 
-			auto posForVert = vec3(x, height * 30.0f, z);
-			auto colorForVert = vec3(color.r, color.g, color.b);
-			*vertPosIter++ = posForVert;
-			*vertPosIter++ = posForVert + vec3(1, 0, 0);
-			*vertPosIter++ = posForVert + vec3(0, 0, 1);
+			VertInfo vert00 = getVertInfo(p, rgbImg, redImg);
+			VertInfo vert01 = getVertInfo(p + ivec2(0, 1), rgbImg, redImg);
+			VertInfo vert10 = getVertInfo(p + ivec2(1, 0), rgbImg, redImg);
+			VertInfo vert11 = getVertInfo(p + ivec2(1, 1), rgbImg, redImg);
+
+			auto colorForVert = vert00.color;
+			*vertPosIter++ = vert00.pos;
+			*vertPosIter++ = vert01.pos;
+			*vertPosIter++ = vert11.pos;
+			*vertPosIter++ = vert00.pos;
+			*vertPosIter++ = vert11.pos;
+			*vertPosIter++ = vert10.pos;
+			*vertColorIter++ = colorForVert;
+			*vertColorIter++ = colorForVert;
+			*vertColorIter++ = colorForVert;
 			*vertColorIter++ = colorForVert;
 			*vertColorIter++ = colorForVert;
 			*vertColorIter++ = colorForVert;

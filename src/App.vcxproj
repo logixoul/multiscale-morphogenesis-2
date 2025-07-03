@@ -56,7 +56,8 @@
   </PropertyGroup>
   <PropertyGroup Label="Vcpkg" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <VcpkgUseStatic>true</VcpkgUseStatic>
-    <VcpkgAdditionalInstallOptions>--overlay-triplets=../lx-triplets</VcpkgAdditionalInstallOptions>
+    <VcpkgAdditionalInstallOptions>
+    </VcpkgAdditionalInstallOptions>
     <VcpkgTriplet>
     </VcpkgTriplet>
   </PropertyGroup>
