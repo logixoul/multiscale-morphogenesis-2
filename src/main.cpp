@@ -136,7 +136,7 @@ struct SApp : App {
 		int mWidth = sx;
 		int mHeight = sy;
 
-		mVboMesh = gl::VboMesh::create(mWidth * mHeight, GL_POINTS, { gl::VboMesh::Layout().usage(GL_STATIC_DRAW).attrib(geom::POSITION, 3).attrib(geom::COLOR, 3) });
+		mVboMesh = gl::VboMesh::create(mWidth * mHeight * 3, GL_TRIANGLES, { gl::VboMesh::Layout().usage(GL_STATIC_DRAW).attrib(geom::POSITION, 3).attrib(geom::COLOR, 3) });
 		mPointsBatch = gl::Batch::create(mVboMesh, gl::getStockShader(gl::ShaderDef().color()));
 
 		updateData(gtex(img));
@@ -161,8 +161,14 @@ struct SApp : App {
 			float x = p.x - sx / 2.0f;
 			float z = p.y - sy / 2.0f;
 
-			*vertPosIter++ = vec3(x, height * 30.0f, z);
-			*vertColorIter++ = vec3(color.r, color.g, color.b);
+			auto posForVert = vec3(x, height * 30.0f, z);
+			auto colorForVert = vec3(color.r, color.g, color.b);
+			*vertPosIter++ = posForVert;
+			*vertPosIter++ = posForVert + vec3(1, 0, 0);
+			*vertPosIter++ = posForVert + vec3(0, 0, 1);
+			*vertColorIter++ = colorForVert;
+			*vertColorIter++ = colorForVert;
+			*vertColorIter++ = colorForVert;
 		}
 
 		vertPosIter.unmap();
@@ -382,7 +388,7 @@ struct SApp : App {
 			"float der = fetch2(tex2).y;"
 			"if(der > 0.03 && der < 0.2 && val > 0.1) der = der * 15.0 + .1;"
 			"der = max(0, der);"
-			"fire += der;"
+			//"fire += der;"
 			"_out.rgb = fire;",
 			ShadeOpts().ifmt(GL_RGB16F)
 		);
