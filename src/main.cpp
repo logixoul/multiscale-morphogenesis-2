@@ -13,7 +13,15 @@
 
 #include "CrossThreadCallQueue.h"
 
-typedef WrapModes::GetWrapped WrapMode;
+/*struct GetWrappedX {
+	template<class T>
+	static T& fetch(Array2D<T>& src, int x, int y)
+	{
+		int clamped
+		return src(
+		return ::getWrapped(src, x, y);
+	}
+};*/
 
 Array2D<vec3> resize(Array2D<vec3> src, ivec2 dstSize, const ci::FilterBase& filter)
 {
@@ -154,7 +162,31 @@ struct SApp : App {
 		auto tex = gtex(img);
 		gl::TextureRef gradientsTex;
 		gradientsTex = get_gradients_tex_v2(tex, GL_REPEAT, GL_CLAMP_TO_EDGE);
-		tex = shade2(tex, gradientsTex,
+
+		auto gradients = dl<vec2>(gradientsTex);
+		static const auto perpLeft = [&](vec2 v) { return vec2(-v.y, v.x); }; //correct
+		auto guidance = img;
+		auto img2 = img.clone();
+		for (int x = 0; x < img.w; x++)
+		{
+			for (int y = 0; y < img.h; y++)
+			{
+				vec2 p = vec2(x, y);
+				vec2 grad = safeNormalized(gradients(x, y));
+
+				vec2 gradP = perpLeft(grad);
+
+				float val = guidance(x, y);
+				float valLeft = getBilinear<float, WrapModes::GetWrapped>(guidance, p + gradP);
+				float valRight = getBilinear<float, WrapModes::GetWrapped>(guidance, p - gradP);
+				float add = (val - (valLeft + valRight) * .5f);
+				if (add < 0.0)
+					add = 0;
+				aaPoint<float, WrapModes::GetWrapped>(img2, p - grad * 1.0f, add * abc);
+				//img2(p) += add * abc;
+			}
+		}
+		/*tex = shade2(tex, gradientsTex,
 			"vec2 grad = fetch2(tex2);"
 			"vec2 dir = perpLeft(safeNormalized(grad));"
 			""
@@ -168,18 +200,14 @@ struct SApp : App {
 			"vec2 perpLeft(vec2 v) {"
 			"	return vec2(-v.y, v.x);"
 			"}"
-		);
-		
-		/*auto imgb = gauss3_<float, WrapModes::GetWrapped>(img);//gaussianBlur(img, 3);
-		//img=imgb;
-		forxy(img) {
-			img(p) = lerp(img(p), imgb(p), .8f);
-		}*/
+		);*/
+		tex = gtex(img2);
 		auto texb = tex;
 		for (int i = 0; i < 3; i++) {
 			texb->setWrap(GL_REPEAT, GL_CLAMP_TO_EDGE);
 			texb = gauss3tex(texb);
 		}
+		//tex = texb;
 		
 		tex = shade2(tex, texb,
 			"float f = fetch1();"
@@ -205,13 +233,6 @@ struct SApp : App {
 			else {
 				img(p) = glm::mix(img(p), 1.0f, (floatY - 0.5f) * 2);
 			}
-		}
-		forxy(img) {
-			auto& c = img(p);
-			c = ci::constrain(c, 0.0f, 1.0f);
-			auto c2 = 3.0f * c * c - 2.0f * c * c * c;
-			c = mix(c, c2, contrastizeFactor);
-			c = ci::constrain(c, 0.0f, 1.0f);
 		}
 		return img;
 	}
@@ -285,6 +306,15 @@ struct SApp : App {
 		}
 		img = multiscaleApply(img, [this](auto arg) { return update_1_scale(arg); });
 		//img = update_1_scale(img);
+
+		forxy(img) {
+			auto& c = img(p);
+			c = ci::constrain(c, 0.0f, 1.0f);
+			auto c2 = 3.0f * c * c - 2.0f * c * c * c;
+			c = mix(c, c2, contrastizeFactor);
+			c = ci::constrain(c, 0.0f, 1.0f);
+		}
+
 	}
 
 	void stefanDraw()
