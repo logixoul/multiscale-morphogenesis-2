@@ -11,3 +11,5 @@ in dev command prompt:
 vcpkg new --application
 vcpkg add port imgui
 vcpkg add port imgui[opengl3-binding]
+vcpkg add port fftw3
+vcpkg install --triplet=x64-windows-static

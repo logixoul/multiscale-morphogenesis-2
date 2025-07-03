@@ -1,6 +1,9 @@
 {
   "dependencies": [
     {
+      "name": "fftw3"
+    },
+    {
       "name": "imgui",
       "features": [
         "opengl3-binding"
