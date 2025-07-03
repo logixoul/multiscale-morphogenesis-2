@@ -39,7 +39,9 @@ auto fragShader = CI_GLSL(150,
 		const vec3 L = vec3(0, 0, 1);
 		vec3 N = normalize(Normal);
 		float lambert = max(0.0, dot(N, L));
-		oColor = vec4(1) * Color * vec4(vec3(lambert), 1.0);
+		float specular = pow(max(0.0, dot(reflect(-L, N), vec3(0, 0, 1))), 16.0);
+		oColor.rgb = Color.rgb * lambert + vec3(specular);
+		oColor.a = 1.0;
 	}
 );
 
