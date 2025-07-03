@@ -46,6 +46,7 @@ auto fragShader = CI_GLSL(150,
 	in highp vec3 ViewPos;
 	in highp vec3 LightPos;
 	uniform samplerCube uCubeMapTex;
+
 	void main(void)
 	{
 		vec3 V = normalize(-ViewPos); // Camera is at (0,0,0) in view space
@@ -519,13 +520,30 @@ struct SApp : App {
 			"float val = fetch1();"
 			"float fw = fwidth(val);"
 			// this is taken from https://www.shadertoy.com/view/Mld3Rn
-			"vec3 fire = vec3(min(val * 1.5, 1.), pow(val, 2.5), pow(val, 12.)); "
+			//"vec3 fire = vec3(min(val * 1.5, 1.), pow(val, 2.5), pow(val, 12.)); "
+
+			"vec3 fire = myPalette(fract(val+time*.1));"
+
 			"float der = fetch2(tex2).x;"
 			//"fire = createRotationMatrix(vec3(1,1,1), der * 100.0) * fire;"
 			"_out.rgb = fire;",
-			ShadeOpts().ifmt(GL_RGB16F),
+			ShadeOpts().ifmt(GL_RGB16F).uniform("time", (float)getElapsedSeconds()),
 			// from chatgpt
 			MULTILINE(
+				const float PI = 3.14159265359; // Define PI if not already defined
+				
+				vec3 palette(in float t, in vec3 a, in vec3 b, in vec3 c, in vec3 d) {
+					return a + b * cos(2.0 * PI * (c * t + d));
+				}
+				// https://iquilezles.org/articles/palettes/
+				vec3 myPalette(in float t) {
+					return palette(t,
+						vec3(0.5, 0.5, 0.5),     // a: Adjusted to ensure non-negative, and staying under 1
+						vec3(0.5, 0.5, 0.5),     // b: Also adjusted
+						vec3(1.0, 1.0, 1.0),     // c: Frequencies
+						vec3(0.00, 0.10, 0.20)     // d: Phases
+					);
+				}
 				mat3 createRotationMatrix(vec3 axis, float radians) {
 					axis = normalize(axis);
 					float c = cos(radians);
