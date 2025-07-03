@@ -137,8 +137,8 @@ struct SApp : App {
 		int mHeight = sy;
 
 		// * 6 because each quad is made of 2 triangles, and each triangle has 3 vertices
-		mVboMesh = gl::VboMesh::create(mWidth * mHeight * 6, GL_TRIANGLES, { gl::VboMesh::Layout().usage(GL_STATIC_DRAW).attrib(geom::POSITION, 3).attrib(geom::COLOR, 3) });
-		mPointsBatch = gl::Batch::create(mVboMesh, gl::getStockShader(gl::ShaderDef().color()));
+		mVboMesh = gl::VboMesh::create(mWidth * mHeight * 6, GL_TRIANGLES, { gl::VboMesh::Layout().usage(GL_STATIC_DRAW).attrib(geom::POSITION, 3).attrib(geom::NORMAL, 3).attrib(geom::COLOR, 3) });
+		mPointsBatch = gl::Batch::create(mVboMesh, gl::getStockShader(gl::ShaderDef().color()/*.lambert()*/));
 
 		updateData(gtex(img));
 		mCam.lookAt(vec3(mWidth / 2, 50, mHeight / 2), vec3(0));
@@ -146,17 +146,58 @@ struct SApp : App {
 
 	struct VertInfo {
 		vec3 pos;
+		vec3 normal;
 		vec3 color;
 	};
 
-	VertInfo getVertInfo(ivec2 p, Array2D<vec3> const& rgbImg, Array2D<float> const& redImg)
+	// done by chatgpt
+	Array2D<vec3> calcNormals(Array2D<float> heightField) {
+		int w = heightField.w;
+		int h = heightField.h;
+		Array2D<vec3> normals(w, h);
+
+		for (int y = 0; y < h; ++y) {
+			for (int x = 0; x < w; ++x) {
+				ivec2 p(x, y);
+
+				// Use clamped neighbors for borders
+				ivec2 px0(std::max(x - 1, 0), y);
+				ivec2 px1(std::min(x + 1, w - 1), y);
+				ivec2 py0(x, std::max(y - 1, 0));
+				ivec2 py1(x, std::min(y + 1, h - 1));
+
+				vec3 left = calcVertPos(px0, heightField);
+				vec3 right = calcVertPos(px1, heightField);
+				vec3 down = calcVertPos(py0, heightField);
+				vec3 up = calcVertPos(py1, heightField);
+
+				// Central difference vectors
+				vec3 dx = right - left;
+				vec3 dz = up - down;
+
+				// Normal from cross product
+				vec3 normal = normalize(cross(dz, dx));
+				normals(x, y) = normal;
+			}
+		}
+
+		return normals;
+	}
+	vec3 calcVertPos(ivec2 p, Array2D<float> const& redImg)
 	{
 		float height = redImg(p);
-		float x = p.x - sx / 2.0f;
-		float z = p.y - sy / 2.0f;
+		float x = p.x - redImg.w / 2.0f;
+		float z = p.y - redImg.h / 2.0f;
+		return vec3(x, height * 30.0f, z);
+	}
+
+	VertInfo getVertInfo(ivec2 p, Array2D<vec3> const& rgbImg, Array2D<vec3> const& normalsImg, Array2D<float> const& redImg)
+	{
+		float height = redImg(p);
 		VertInfo vert;
-		vert.pos = vec3(x, height * 30.0f, z);
+		vert.pos = calcVertPos(p, redImg);
 		vert.color = rgbImg(p);
+		vert.normal = normalsImg(p);
 		return vert;
 	}
 
@@ -165,22 +206,21 @@ struct SApp : App {
 		auto rgbTex = redToRgb(redTex);
 		auto rgbImg = dl<vec3>(rgbTex);
 		auto redImg = dl<float>(redTex);
+
+		auto normalsImg = calcNormals(redImg);
+
 		auto vertPosIter = mVboMesh->mapAttrib3f(geom::POSITION);
+		auto vertNormalIter = mVboMesh->mapAttrib3f(geom::NORMAL);
 		auto vertColorIter = mVboMesh->mapAttrib3f(geom::COLOR);
 
 		forxy(img) {
 			if(p.x == img.w-1 || p.y == img.h-1)
 				continue;
-			float height = redImg(p);
 
-			// the x and the z coordinates correspond to the pixel's x & y
-			float x = p.x - sx / 2.0f;
-			float z = p.y - sy / 2.0f;
-
-			VertInfo vert00 = getVertInfo(p, rgbImg, redImg);
-			VertInfo vert01 = getVertInfo(p + ivec2(0, 1), rgbImg, redImg);
-			VertInfo vert10 = getVertInfo(p + ivec2(1, 0), rgbImg, redImg);
-			VertInfo vert11 = getVertInfo(p + ivec2(1, 1), rgbImg, redImg);
+			VertInfo vert00 = getVertInfo(p, rgbImg, normalsImg, redImg);
+			VertInfo vert01 = getVertInfo(p + ivec2(0, 1), rgbImg, normalsImg, redImg);
+			VertInfo vert10 = getVertInfo(p + ivec2(1, 0), rgbImg, normalsImg, redImg);
+			VertInfo vert11 = getVertInfo(p + ivec2(1, 1), rgbImg, normalsImg, redImg);
 
 			auto colorForVert = vert00.color;
 			*vertPosIter++ = vert00.pos;
@@ -189,15 +229,25 @@ struct SApp : App {
 			*vertPosIter++ = vert00.pos;
 			*vertPosIter++ = vert11.pos;
 			*vertPosIter++ = vert10.pos;
-			*vertColorIter++ = colorForVert;
-			*vertColorIter++ = colorForVert;
-			*vertColorIter++ = colorForVert;
-			*vertColorIter++ = colorForVert;
-			*vertColorIter++ = colorForVert;
-			*vertColorIter++ = colorForVert;
+
+			*vertNormalIter++ = vert00.normal;
+			*vertNormalIter++ = vert01.normal;
+			*vertNormalIter++ = vert11.normal;
+			*vertNormalIter++ = vert00.normal;
+			*vertNormalIter++ = vert11.normal;
+			*vertNormalIter++ = vert10.normal;
+
+
+			*vertColorIter++ = vert00.color;
+			*vertColorIter++ = vert01.color;
+			*vertColorIter++ = vert11.color;
+			*vertColorIter++ = vert00.color;
+			*vertColorIter++ = vert11.color;
+			*vertColorIter++ = vert10.color;
 		}
 
 		vertPosIter.unmap();
+		vertNormalIter.unmap();
 		vertColorIter.unmap();
 	}
 
