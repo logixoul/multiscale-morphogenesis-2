@@ -195,7 +195,7 @@ struct SApp : App {
 			"float valLeft = fetch1(tex, tc + tsize * dir);"
 			"float valRight = fetch1(tex, tc - tsize * dir);"
 			"float add = (val - (valLeft + valRight) * .5f);"
-			"if(add < 0.0) add = 0;"
+			//"if(add < 0.0) add = 0;"
 			"_out.r = val + add * abc;"
 			, ShadeOpts().uniform("abc", abc),
 			"vec2 perpLeft(vec2 v) {"
@@ -306,10 +306,10 @@ struct SApp : App {
 	float blendWeaken;
 	float weightFactor;
 	void stefanUpdate() {
-		abc = cfg2::getFloat("morphogenesis", .02, 0.068, 20, 5, ImGuiSliderFlags_Logarithmic);
-		contrastizeFactor = cfg2::getFloat("contrastizeFactor", 1.f, 0.01, 100, 3.3f, ImGuiSliderFlags_Logarithmic);
+		abc = cfg2::getFloat("morphogenesis", .02, 0.068, 20, 1.369, ImGuiSliderFlags_Logarithmic);
+		contrastizeFactor = cfg2::getFloat("contrastizeFactor", 1.f, 0.01, 100, 1.198f, ImGuiSliderFlags_Logarithmic);
 		blendWeaken = cfg2::getFloat("blendWeaken", 0.01f, 0.1, .499, .499f);
-		weightFactor = cfg2::getFloat("weightFactor", 0.1f, 0.1, 30, 1, ImGuiSliderFlags_Logarithmic);
+		weightFactor = cfg2::getFloat("weightFactor", 0.1f, 0.1, 30, 30, ImGuiSliderFlags_Logarithmic);
 
 		if (pause2) {
 			return;
@@ -354,7 +354,7 @@ struct SApp : App {
 					"float der = fetch2(tex2).y;"
 					"if(der > 0.03 && der < 0.2 && val > 0.1) der = der * 15.0 + .1;"
 					"der = max(0, der);"
-					//"fire += der;"
+					"fire += der;"
 					"_out.rgb = fire;",
 					ShadeOpts().ifmt(GL_RGB16F)
 					);
