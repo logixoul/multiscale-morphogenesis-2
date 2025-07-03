@@ -31,8 +31,11 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <cinder/gl/GlslProg.h>
 #include <cinder/gl/Texture.h>
 #include <cinder/gl/Fbo.h>
+#include <cinder/gl/VboMesh.h>
 #include <cinder/gl/gl.h>
 #include <cinder/ImageIo.h> // todo rm?
+#include "cinder/CameraUi.h"
+
 
 //#include <cinder/Vector.h>
 #include <glm/vec2.hpp>

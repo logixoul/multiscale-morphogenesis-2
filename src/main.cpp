@@ -110,6 +110,11 @@ Array2D<T> gauss3_(Array2D<T> src) {
 }
 
 struct SApp : App {
+	CameraPersp		mCam;
+	CameraUi		mCamUi;
+	gl::BatchRef	mPointsBatch;
+	gl::VboMeshRef	mVboMesh;
+	
 	void setup()
 	{
 
@@ -122,6 +127,46 @@ struct SApp : App {
 		stefanfw::eventHandler.subscribeToEvents(*this);
 
 		cfg2::init();
+
+		// code from cinder_0.9.2_vc2015\samples\ImageHeightField\src
+		mCamUi = ci::CameraUi(&mCam, getWindow());
+        mCam.setNearClip(10);
+		mCam.setFarClip(2000);
+
+		int mWidth = sx;
+		int mHeight = sy;
+
+		mVboMesh = gl::VboMesh::create(mWidth * mHeight, GL_POINTS, { gl::VboMesh::Layout().usage(GL_STATIC_DRAW).attrib(geom::POSITION, 3).attrib(geom::COLOR, 3) });
+		mPointsBatch = gl::Batch::create(mVboMesh, gl::getStockShader(gl::ShaderDef().color()));
+
+		updateData(gtex(img));
+		mCam.lookAt(vec3(mWidth / 2, 50, mHeight / 2), vec3(0));
+	}
+
+	void updateData(Tex redTex)
+	{
+		auto rgbTex = redToRgb(redTex);
+		auto rgbImg = dl<vec3>(rgbTex);
+		auto vertPosIter = mVboMesh->mapAttrib3f(geom::POSITION);
+		auto vertColorIter = mVboMesh->mapAttrib3f(geom::COLOR);
+
+		forxy(img) {
+			Color color(rgbImg(p).r, rgbImg(p).g, rgbImg(p).b);
+			float height;
+			const float muteColor = 0.2f;
+
+			height = dot(color, Color(0.3333f, 0.3333f, 0.3333f));
+				
+			// the x and the z coordinates correspond to the pixel's x & y
+			float x = p.x - sx / 2.0f;
+			float z = p.y - sy / 2.0f;
+
+			*vertPosIter++ = vec3(x, height * 30.0f, z);
+			*vertColorIter++ = vec3(color.r, color.g, color.b);
+		}
+
+		vertPosIter.unmap();
+		vertColorIter.unmap();
 	}
 
 	void update()
@@ -326,15 +371,30 @@ struct SApp : App {
 		}
 
 	}
-
+	Tex redToRgb(Tex red) {
+		auto grads = ::get_gradients_tex(red);
+		return shade2(red, grads,
+			"float val = fetch1();"
+			"float fw = fwidth(val);"
+			//"val = smoothstep(0.5-fw/2, 0.5+fw/2, val);"
+			// this is taken from https://www.shadertoy.com/view/Mld3Rn
+			"vec3 fire = vec3(min(val * 1.5, 1.), pow(val, 2.5), pow(val, 12.)); "
+			"float der = fetch2(tex2).y;"
+			"if(der > 0.03 && der < 0.2 && val > 0.1) der = der * 15.0 + .1;"
+			"der = max(0, der);"
+			"fire += der;"
+			"_out.rgb = fire;",
+			ShadeOpts().ifmt(GL_RGB16F)
+		);
+	}
 	void stefanDraw()
 	{
-		gl::clear(Color(0, 0, 0));
+		//gl::clear(Color(0, 0, 0));
 		cout << "frame# " << getElapsedFrames() << endl;
 
 		//gl::setMatricesWindowPersp(vec2(sx, sy), 90.0f, 1.0f, 1000.0f, false);
 		gl::setMatricesWindow(vec2(wsx, wsy), false);
-		gl::clearDepth(0.0f);
+		//gl::clearDepth(0.0f);
 		gl::clear(ColorA::black(), true);
 		gl::disableDepthRead();
 		//gl::enableDepth();
@@ -342,25 +402,23 @@ struct SApp : App {
 
 		sw::timeit("draw", [&]() {
 			if (1) {
-				//renderer.render(img);
 				auto tex = gtex(img);
-				auto grads = ::get_gradients_tex(tex);
-				tex = shade2(tex, grads,
-					"float val = fetch1();"
-					"float fw = fwidth(val);"
-					//"val = smoothstep(0.5-fw/2, 0.5+fw/2, val);"
-					// this is taken from https://www.shadertoy.com/view/Mld3Rn
-					"vec3 fire = vec3(min(val * 1.5, 1.), pow(val, 2.5), pow(val, 12.)); "
-					"float der = fetch2(tex2).y;"
-					"if(der > 0.03 && der < 0.2 && val > 0.1) der = der * 15.0 + .1;"
-					"der = max(0, der);"
-					"fire += der;"
-					"_out.rgb = fire;",
-					ShadeOpts().ifmt(GL_RGB16F)
-					);
-				//tex = redToLuminance(tex);
-				//tex->setMagFilter(GL_NEAREST);
-				gl::draw(tex, getWindowBounds());
+				updateData(tex);
+
+				//gl::draw(tex, getWindowBounds());
+				
+				gl::enableAlphaBlending();
+				gl::enableDepthRead();
+				gl::enableDepthWrite();
+
+				gl::pushMatrices();
+				gl::setMatrices(mCam);
+				if (mPointsBatch)
+					mPointsBatch->draw();
+				gl::popMatrices();
+				gl::disableDepthRead();
+				gl::disableDepthWrite();
+				gl::disableAlphaBlending();
 			}
 			else {
 				vector<gl::TextureRef> ordered;
