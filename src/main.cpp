@@ -175,7 +175,8 @@ struct SApp : App {
 		mPointsBatch = gl::Batch::create(mVboMesh, shaderProg);
 
 		updateData(gtex(img));
-		mCam.lookAt(vec3(mWidth / 2, 50, mHeight / 2), vec3(0));
+		mCam.lookAt(vec3(0, 0, -mWidth * .5), vec3(0, 0, 0));
+		mCam.setFov(70.0f);
 	}
 
 	struct VertInfo {
@@ -221,8 +222,8 @@ struct SApp : App {
 	{
 		float height = redImg(p);
 		float x = p.x - redImg.w / 2.0f;
-		float z = p.y - redImg.h / 2.0f;
-		return vec3(x, height * 30.0f, z);
+		float y = p.y - redImg.h / 2.0f;
+		return vec3(x, y, height * 30.0f);
 	}
 
 	VertInfo getVertInfo(ivec2 p, Array2D<vec3> const& rgbImg, Array2D<vec3> const& normalsImg, Array2D<float> const& redImg)
