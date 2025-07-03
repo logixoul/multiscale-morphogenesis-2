@@ -13,6 +13,36 @@
 
 #include "CrossThreadCallQueue.h"
 
+auto vertShader = CI_GLSL(150,
+	uniform mat4 ciModelViewProjection;
+	uniform mat3 ciNormalMatrix;
+
+	in vec4 ciPosition;
+	in vec4 ciColor;
+	out lowp vec4 Color;
+	in vec3 ciNormal;
+	out highp vec3 Normal;
+	void main(void)
+	{
+		gl_Position = ciModelViewProjection * ciPosition;
+		Color = ciColor;
+		Normal = ciNormalMatrix * ciNormal;
+	}
+);
+
+auto fragShader = CI_GLSL(150,
+	out vec4 oColor;
+	in vec4 Color;
+	in vec3 Normal;
+	void main(void)
+	{
+		const vec3 L = vec3(0, 0, 1);
+		vec3 N = normalize(Normal);
+		float lambert = max(0.0, dot(N, L));
+		oColor = vec4(1) * Color * vec4(vec3(lambert), 1.0);
+	}
+);
+
 /*struct GetWrappedX {
 	template<class T>
 	static T& fetch(Array2D<T>& src, int x, int y)
@@ -136,9 +166,11 @@ struct SApp : App {
 		int mWidth = sx;
 		int mHeight = sy;
 
+
+		auto shaderProg = gl::GlslProg::create(vertShader, fragShader);
 		// * 6 because each quad is made of 2 triangles, and each triangle has 3 vertices
 		mVboMesh = gl::VboMesh::create(mWidth * mHeight * 6, GL_TRIANGLES, { gl::VboMesh::Layout().usage(GL_STATIC_DRAW).attrib(geom::POSITION, 3).attrib(geom::NORMAL, 3).attrib(geom::COLOR, 3) });
-		mPointsBatch = gl::Batch::create(mVboMesh, gl::getStockShader(gl::ShaderDef().color()/*.lambert()*/));
+		mPointsBatch = gl::Batch::create(mVboMesh, shaderProg);
 
 		updateData(gtex(img));
 		mCam.lookAt(vec3(mWidth / 2, 50, mHeight / 2), vec3(0));
