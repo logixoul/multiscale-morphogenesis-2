@@ -570,19 +570,28 @@ struct SApp : App {
 			"vec3 diffuse = myPalette(val);"
 			
 			"float der = fetch2(tex2).x;"
-			"vec3 hueShifted = createRotationMatrix(vec3(1,1,1), 1+der * 10.0) * diffuse;"
+			"vec3 hueShifted = createRotationMatrix(vec3(1,1,1), 1+der * 17.0) * diffuse;"
 			
 			"diffuse = mix(diffuse, hueShifted, val/(val+1));"
 			
 			"diffuse = clamp(diffuse, vec3(0.0), vec3(1.0));"
 			// raise saturation & contrast
 			"diffuse = smoothstep(vec3(0.0), vec3(1.0), diffuse);"
+			//"diffuse = adjustSaturation(diffuse, 1.2);"
 			"_out.rgb = diffuse;",
 			ShadeOpts().ifmt(GL_RGB16F).uniform("time", (float)getElapsedSeconds()),
 			// from chatgpt
 			MULTILINE(
 				const float PI = 3.14159265359; // Define PI if not already defined
-				
+				vec3 adjustSaturation(vec3 color, float saturation)
+				{
+					// Compute the luminance (perceived brightness)
+					float gray = dot(color, vec3(0.2126, 0.7152, 0.0722));
+
+					// Lerp between grayscale and original color
+					vec3 c = mix(vec3(gray), color, saturation);
+					return clamp(c, vec3(0.0), vec3(1.0));
+				}
 				vec3 palette(in float t, in vec3 a, in vec3 b, in vec3 c, in vec3 d) {
 					return a + b * cos(2.0 * PI * (c * t + d));
 				}
