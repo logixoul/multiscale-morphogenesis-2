@@ -53,6 +53,19 @@ auto fragShader = CI_GLSL(150,
 	uniform samplerCube uCubeMapTex;
 	uniform mat3 uInvViewRot;
 
+	const float whitePoint = 11.2;
+	// http://filmicworlds.com/blog/filmic-tonemapping-operators/
+	vec3 Uncharted2Tonemap(vec3 color) {
+		// Filmic tonemapping curve (from Uncharted 2)
+		const float A = 0.15;
+		const float B = 0.50;
+		const float C = 0.10;
+		const float D = 0.20;
+		const float E = 0.02;
+		const float F = 0.30;
+		return (color * (A * color + C * B) + D * E) / (color * (A * color + B) + D * F);
+	}
+
 	void main(void)
 	{
 		vec3 V = normalize(-ViewPos); // Camera is at (0,0,0) in view space
@@ -72,13 +85,19 @@ auto fragShader = CI_GLSL(150,
 		float fresnelBase = 0.1; // reflectance at normal incidence (F₀)
 		float fresnel = fresnelBase + (1.0 - fresnelBase) * pow(1.0 - max(dot(N, V), 0.0), 5.0);
 
-		oColor.rgb = Color.rgb * lambert + specular *fresnel*.3;
+		oColor.rgb = .3*Color.rgb * lambert + specular * fresnel;// *.3;
 		/*float stripe = 3 / (abs(WsPos.z - 15) * 10 + .1);
 		float stripeFw = fwidth(stripe);
 		stripe = smoothstep(0.5 - stripeFw, 0.5 + stripeFw, stripe);
 		oColor.rgb += oColor.rgb * stripe*4;*/
-		oColor.rgb *= 14.0; // hardcoded exposure correction
-		oColor.rgb /= oColor.rgb + 1;
+		oColor.rgb *= 16.0; // hardcoded exposure correction
+		//float luminance = dot(oColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+		//oColor.rgb /= oColor.rgb + 1;
+		const float ExposureBias = 2.0f;
+		oColor.rgb = Uncharted2Tonemap(ExposureBias * oColor.rgb);
+		vec3 whiteScale = vec3(1.0f) / Uncharted2Tonemap(vec3(whitePoint));
+		oColor.rgb = oColor.rgb * whiteScale;
+		oColor.rgb = pow(oColor.rgb, vec3(1 / 2.2)); // gamma correction
 		oColor.a = 1.0;
 	}
 );
@@ -548,6 +567,7 @@ struct SApp : App {
 			//"vec3 fire = vec3(min(val * 1.5, 1.), pow(val, 2.5), pow(val, 12.)); "
 
 			"vec3 fire = myPalette(fract(val+time*.1*0));"
+			"fire = smoothstep(vec3(0.0), vec3(1.0), fire);" // raise saturation
 
 			"float der = fetch2(tex2).x;"
 			//"fire = createRotationMatrix(vec3(1,1,1), der * 100.0) * fire;"
