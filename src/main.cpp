@@ -12,6 +12,8 @@
 #include "stefanfw.h"
 
 #include "CrossThreadCallQueue.h"
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 
 auto vertShader = CI_GLSL(150,
 	uniform mat4 ciModelViewProjection;
@@ -25,9 +27,11 @@ auto vertShader = CI_GLSL(150,
 	out highp vec3 Normal;
 	out highp vec3 ViewPos;
 	out highp vec3 LightPos;
+	out highp vec3 WsPos;
 	void main(void)
 	{
 		gl_Position = ciModelViewProjection * ciPosition;
+		WsPos = ciPosition.xyz;
 		Color = ciColor;
 		Normal = ciNormalMatrix * ciNormal;
 
@@ -45,22 +49,36 @@ auto fragShader = CI_GLSL(150,
 	in vec3 Normal;
 	in highp vec3 ViewPos;
 	in highp vec3 LightPos;
+	in highp vec3 WsPos;
 	uniform samplerCube uCubeMapTex;
+	uniform mat3 uInvViewRot;
 
 	void main(void)
 	{
 		vec3 V = normalize(-ViewPos); // Camera is at (0,0,0) in view space
 		vec3 N = normalize(Normal);
 		float lambert = max(0.0, dot(N, LightPos));
-		//float specular = pow(max(0.0, dot(reflect(-LightPos, N), V)), 16.0);
-		vec3 specular = texture(uCubeMapTex, reflect(V, N)).rgb;
+		vec3 ViewSpaceReflected = reflect(V, N);
+		//float specular = pow(max(0.0, dot(ViewSpaceReflected, V)), 16.0);
+		vec3 specular = texture(uCubeMapTex, ViewSpaceReflected).rgb;
 		specular = vec3(dot(specular, vec3(0.2126, 0.7152, 0.0722))); // Convert to grayscale
-		
+		//specular = pow(specular, vec3(0.5)); // Adjust specular intensity
+		vec3 worldReflected = uInvViewRot * ViewSpaceReflected;
+		// approximation/hack: if the reflected vector points toward the object itself, assume it will hit the object rather than the envmap
+		if(worldReflected.z < 0.0) {
+			specular = vec3(0.0);
+		}
 
 		float fresnelBase = 0.1; // reflectance at normal incidence (F₀)
 		float fresnel = fresnelBase + (1.0 - fresnelBase) * pow(1.0 - max(dot(N, V), 0.0), 5.0);
 
 		oColor.rgb = Color.rgb * lambert + specular *fresnel*.3;
+		/*float stripe = 3 / (abs(WsPos.z - 15) * 10 + .1);
+		float stripeFw = fwidth(stripe);
+		stripe = smoothstep(0.5 - stripeFw, 0.5 + stripeFw, stripe);
+		oColor.rgb += oColor.rgb * stripe*4;*/
+		oColor.rgb *= 14.0; // hardcoded exposure correction
+		oColor.rgb /= oColor.rgb + 1;
 		oColor.a = 1.0;
 	}
 );
@@ -167,6 +185,7 @@ struct SApp : App {
 	gl::BatchRef	mPointsBatch;
 	gl::VboMeshRef	mVboMesh;
 	gl::TextureCubeMapRef	mCubeMap;
+	gl::GlslProgRef mShaderProg;
 	
 	void setup()
 	{
@@ -177,7 +196,11 @@ struct SApp : App {
 
 		reset();
 		enableDenormalFlushToZero();
-		setWindowSize(wsx, wsy);
+		//setWindowSize(wsx, wsy);
+		HWND hwnd = (HWND)getWindow()->getNative();
+
+		// Maximize the window
+		ShowWindow(hwnd, SW_MAXIMIZE);
 
 
 		disableGLReadClamp();
@@ -194,11 +217,13 @@ struct SApp : App {
 		int mHeight = sy;
 
 
-		auto shaderProg = gl::GlslProg::create(vertShader, fragShader);
-		shaderProg->uniform("uCubeMapTex", 0);
+		mShaderProg = gl::GlslProg::create(vertShader, fragShader);
+		mShaderProg->uniform("uCubeMapTex", 0);
+		
+
 		// * 6 because each quad is made of 2 triangles, and each triangle has 3 vertices
 		mVboMesh = gl::VboMesh::create(mWidth * mHeight * 6, GL_TRIANGLES, { gl::VboMesh::Layout().usage(GL_STATIC_DRAW).attrib(geom::POSITION, 3).attrib(geom::NORMAL, 3).attrib(geom::COLOR, 3) });
-		mPointsBatch = gl::Batch::create(mVboMesh, shaderProg);
+		mPointsBatch = gl::Batch::create(mVboMesh, mShaderProg);
 
 		updateData(gtex(img));
 		mCam.lookAt(vec3(0, 0, -mWidth * .5), vec3(0, 0, 0));
@@ -249,7 +274,7 @@ struct SApp : App {
 		float height = redImg(p);
 		float x = p.x - redImg.w / 2.0f;
 		float y = p.y - redImg.h / 2.0f;
-		return vec3(x, y, height * 30.0f);
+		return vec3(x, y, height * 50.0f);
 	}
 
 	VertInfo getVertInfo(ivec2 p, Array2D<vec3> const& rgbImg, Array2D<vec3> const& normalsImg, Array2D<float> const& redImg)
@@ -494,9 +519,9 @@ struct SApp : App {
 	float blendWeaken;
 	float weightFactor;
 	void stefanUpdate() {
-		abc = cfg2::getFloat("morphogenesis", .02, 0.068, 20, 1.369, ImGuiSliderFlags_Logarithmic);
-		contrastizeFactor = cfg2::getFloat("contrastizeFactor", 1.f, 0.01, 100, 1.198f, ImGuiSliderFlags_Logarithmic);
-		blendWeaken = cfg2::getFloat("blendWeaken", 0.01f, 0.1, .499, .499f);
+		abc = cfg2::getFloat("morphogenesis", .02, 0.068, 20, 1.613, ImGuiSliderFlags_Logarithmic);
+		contrastizeFactor = cfg2::getFloat("contrastizeFactor", 1.f, 0.01, 100, 0.829f, ImGuiSliderFlags_Logarithmic);
+		blendWeaken = cfg2::getFloat("blendWeaken", 0.01f, 0.1, .499, .478f);
 		weightFactor = cfg2::getFloat("weightFactor", 0.1f, 0.1, 30, 30, ImGuiSliderFlags_Logarithmic);
 
 		if (pause2) {
@@ -522,7 +547,7 @@ struct SApp : App {
 			// this is taken from https://www.shadertoy.com/view/Mld3Rn
 			//"vec3 fire = vec3(min(val * 1.5, 1.), pow(val, 2.5), pow(val, 12.)); "
 
-			"vec3 fire = myPalette(fract(val+time*.1));"
+			"vec3 fire = myPalette(fract(val+time*.1*0));"
 
 			"float der = fetch2(tex2).x;"
 			//"fire = createRotationMatrix(vec3(1,1,1), der * 100.0) * fire;"
@@ -584,6 +609,11 @@ struct SApp : App {
 				gl::pushMatrices();
 				gl::setMatrices(mCam);
 				gl::ScopedTextureBind texBind(mCubeMap, 0);
+
+				// Use only the 3×3 rotation part of the matrix for transforming direction vectors (no translation needed). (ChatGPT)
+				glm::mat3 invViewRot = glm::mat3(glm::inverse(mCam.getViewMatrix()));
+				mShaderProg->uniform("uInvViewRot", invViewRot);
+
 				if (mPointsBatch)
 					mPointsBatch->draw();
 				gl::popMatrices();
