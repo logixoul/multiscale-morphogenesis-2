@@ -562,16 +562,22 @@ struct SApp : App {
 		auto grads = ::get_gradients_tex(red);
 		return shade2(red, grads,
 			"float val = fetch1();"
+			"val = val+time*.1*0;"
 			"float fw = fwidth(val);"
 			// this is taken from https://www.shadertoy.com/view/Mld3Rn
 			//"vec3 fire = vec3(min(val * 1.5, 1.), pow(val, 2.5), pow(val, 12.)); "
 
-			"vec3 fire = myPalette(fract(val+time*.1*0));"
-			"fire = smoothstep(vec3(0.0), vec3(1.0), fire);" // raise saturation
-
+			"vec3 diffuse = myPalette(val);"
+			
 			"float der = fetch2(tex2).x;"
-			//"fire = createRotationMatrix(vec3(1,1,1), der * 100.0) * fire;"
-			"_out.rgb = fire;",
+			"vec3 hueShifted = createRotationMatrix(vec3(1,1,1), 1+der * 10.0) * diffuse;"
+			
+			"diffuse = mix(diffuse, hueShifted, val/(val+1));"
+			
+			"diffuse = clamp(diffuse, vec3(0.0), vec3(1.0));"
+			// raise saturation & contrast
+			"diffuse = smoothstep(vec3(0.0), vec3(1.0), diffuse);"
+			"_out.rgb = diffuse;",
 			ShadeOpts().ifmt(GL_RGB16F).uniform("time", (float)getElapsedSeconds()),
 			// from chatgpt
 			MULTILINE(
@@ -583,10 +589,10 @@ struct SApp : App {
 				// https://iquilezles.org/articles/palettes/
 				vec3 myPalette(in float t) {
 					return palette(t,
-						vec3(0.5, 0.5, 0.5),     // a: Adjusted to ensure non-negative, and staying under 1
-						vec3(0.5, 0.5, 0.5),     // b: Also adjusted
-						vec3(1.0, 1.0, 1.0),     // c: Frequencies
-						vec3(0.00, 0.10, 0.20)     // d: Phases
+						vec3(0.5, 0.5, 0.5),
+						vec3(0.5, 0.5, 0.5),
+						vec3(1.0, 1.0, 1.0),     // Frequencies
+						vec3(0.00, 0.10, 0.20)     // Phases
 					);
 				}
 				mat3 createRotationMatrix(vec3 axis, float radians) {
