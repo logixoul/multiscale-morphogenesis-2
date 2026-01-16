@@ -172,6 +172,30 @@ gl::TextureRef get_gradients_tex_v2(gl::TextureRef src, GLuint wrapS, GLuint wra
 	);
 }
 
+gl::TextureRef get_gradients_tex_v3(gl::TextureRef src, GLuint wrapS, GLuint wrapT) {
+	GPU_SCOPE("get_gradients_tex");
+	glActiveTexture(GL_TEXTURE0);
+	::bindTexture(src);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrapS);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrapT);
+	return shade2(src,
+		// Sobel 3x3 kernel for X and Y
+		"float nw = fetch1(tex, tc + tsize * vec2(-1.0, -1.0));"
+		"float n  = fetch1(tex, tc + tsize * vec2(0.0, -1.0));"
+		"float ne = fetch1(tex, tc + tsize * vec2(1.0, -1.0));"
+		"float w  = fetch1(tex, tc + tsize * vec2(-1.0, 0.0));"
+		"float e  = fetch1(tex, tc + tsize * vec2(1.0, 0.0));"
+		"float sw = fetch1(tex, tc + tsize * vec2(-1.0, 1.0));"
+		"float s  = fetch1(tex, tc + tsize * vec2(0.0, 1.0));"
+		"float se = fetch1(tex, tc + tsize * vec2(1.0, 1.0));"
+		"float gx = (ne + 2.0 * e + se) - (nw + 2.0 * w + sw);"
+		"float gy = (sw + 2.0 * s + se) - (nw + 2.0 * n + ne);"
+		// normalize by 8 (sum of absolute kernel weights) to keep scale similar to central differences
+		"_out.xy = vec2(gx, gy) / 8.0;",
+		ShadeOpts().ifmt(GL_RG16F)
+	);
+}
+
 // baseline 7fps
 // now 9fps
 
@@ -394,7 +418,7 @@ struct SApp : App {
 		auto tex = gtex(img);
 		gl::TextureRef gradientsTex;
 		//gradientsTex = get_gradients_tex_v2(tex, GL_REPEAT, GL_CLAMP_TO_EDGE);
-		gradientsTex = get_gradients_tex_v2(tex, GL_REPEAT, GL_CLAMP_TO_EDGE);
+		gradientsTex = get_gradients_tex_v3(tex, GL_REPEAT, GL_CLAMP_TO_EDGE);
 
 		/*auto gradients = dl<vec2>(gradientsTex);
 		static const auto perpLeft = [&](vec2 v) { return vec2(-v.y, v.x); }; //correct
@@ -540,7 +564,7 @@ struct SApp : App {
 	void stefanUpdate() {
 		abc = cfg2::getFloat("morphogenesis", .02, 0.068, 20, 1.613, ImGuiSliderFlags_Logarithmic);
 		contrastizeFactor = cfg2::getFloat("contrastizeFactor", 1.f, 0.01, 100, 0.829f, ImGuiSliderFlags_Logarithmic);
-		blendWeaken = cfg2::getFloat("blendWeaken", 0.01f, 0.1, .499, .478f);
+		blendWeaken = cfg2::getFloat("blendWeaken", 0.01f, 0.1, .499, .499f);
 		weightFactor = cfg2::getFloat("weightFactor", 0.1f, 0.1, 30, 30, ImGuiSliderFlags_Logarithmic);
 
 		if (pause2) {
@@ -561,7 +585,7 @@ struct SApp : App {
 	Tex redToRgb(Tex red) {
 		auto grads = ::get_gradients_tex(red);
 		return shade2(red, grads,
-			"float val = fetch1();"
+			"float val = fetch1()/0.2;"
 			"val = val+time*.1*0;"
 			"float fw = fwidth(val);"
 			// this is taken from https://www.shadertoy.com/view/Mld3Rn
@@ -633,6 +657,8 @@ struct SApp : App {
 		sw::timeit("draw", [&]() {
 			if (1) {
 				auto tex = gtex(img);
+				tex = shade2(tex, "_out.rgb = texture(tex, tc).rgb * .2;");
+
 				updateData(tex);
 
 				//gl::draw(tex, getWindowBounds());
