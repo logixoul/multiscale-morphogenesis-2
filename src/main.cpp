@@ -562,8 +562,8 @@ struct SApp : App {
 	float blendWeaken;
 	float weightFactor;
 	void stefanUpdate() {
-		abc = cfg2::getFloat("morphogenesis", .02, 0.068, 20, 1.613, ImGuiSliderFlags_Logarithmic);
-		contrastizeFactor = cfg2::getFloat("contrastizeFactor", 1.f, 0.01, 100, 0.829f, ImGuiSliderFlags_Logarithmic);
+		abc = cfg2::getFloat("morphogenesis", .02, 0.068, 20, 2.418, ImGuiSliderFlags_Logarithmic);
+		contrastizeFactor = cfg2::getFloat("contrastizeFactor", 1.f, 0.01, 100, 0.01f, ImGuiSliderFlags_Logarithmic);
 		blendWeaken = cfg2::getFloat("blendWeaken", 0.01f, 0.1, .499, .499f);
 		weightFactor = cfg2::getFloat("weightFactor", 0.1f, 0.1, 30, 30, ImGuiSliderFlags_Logarithmic);
 
