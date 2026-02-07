@@ -15,6 +15,17 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
+template<class T>
+struct compareVec
+{
+	bool operator() (const glm::vec<2, T>& lhs, const glm::vec<2, T>& rhs) const
+	{
+		if (lhs.x < rhs.x) return -1;
+		if (lhs.x > rhs.x) return 1;
+		return lhs.y < rhs.y;
+	}
+};
+
 auto vertShader = CI_GLSL(150,
 	uniform mat4 ciModelViewProjection;
 	uniform mat4 ciModelView;
@@ -81,6 +92,8 @@ auto fragShader = CI_GLSL(150,
 		if(worldReflected.z < 0.0) {
 			specular = vec3(0.0);
 		}
+
+		specular = vec3(0.0); // DISABLE SPECULAR FOR NOW
 
 		float fresnelBase = 0.1; // reflectance at normal incidence (F₀)
 		float fresnel = fresnelBase + (1.0 - fresnelBase) * pow(1.0 - max(dot(N, V), 0.0), 5.0);
@@ -202,8 +215,8 @@ gl::TextureRef get_gradients_tex_v3(gl::TextureRef src, GLuint wrapS, GLuint wra
 //int wsx=800, wsy=800.0*(800.0/1280.0);
 int wsx = 700, wsy = 700;
 //int scale=2;
-int sx = 256;
-int sy = 256;
+int sx = 350;
+int sy = 350;
 Array2D<float> img(sx, sy);
 bool pause2 = false;
 std::map<int, gl::TextureRef> texs;
@@ -317,7 +330,7 @@ struct SApp : App {
 		float height = redImg(p);
 		float x = p.x - redImg.w / 2.0f;
 		float y = p.y - redImg.h / 2.0f;
-		return vec3(x, y, height * 50.0f);
+		return vec3(x, y, height * 5.0f);
 	}
 
 	VertInfo getVertInfo(ivec2 p, Array2D<vec3> const& rgbImg, Array2D<vec3> const& normalsImg, Array2D<float> const& redImg)
@@ -443,7 +456,8 @@ struct SApp : App {
 				//img2(p) += add * abc;
 			}
 		}*/
-		tex = shade2(tex, gradientsTex,
+		static std::map<glm::ivec2, gl::TextureRef, compareVec<int>> changeMap; // velocity of change
+		auto accTex = shade2(tex, gradientsTex, // acceleration
 			"vec2 grad = fetch2(tex2);"
 			"vec2 dir = perpLeft(safeNormalized(grad));"
 			""
@@ -452,12 +466,20 @@ struct SApp : App {
 			"float valRight = fetch1(tex, tc - tsize * dir);"
 			"float add = (val - (valLeft + valRight) * .5f);"
 			//"if(add < 0.0) add = 0;"
-			"_out.r = val + add * abc;"
+			"_out.r = add * abc;"
 			, ShadeOpts().uniform("abc", abc),
 			"vec2 perpLeft(vec2 v) {"
 			"	return vec2(-v.y, v.x);"
 			"}"
 		);
+		if (changeMap.find(tex->getSize()) == changeMap.end()) {
+			changeMap[tex->getSize()] = maketex(tex->getWidth(), tex->getHeight(), GL_R16F, false, true);
+		}
+		auto changeTex = changeMap[tex->getSize()];
+		changeTex = op(changeTex) + accTex;
+		tex = op(tex) + changeTex;
+
+
 		/*auto tex3 = shade2(tex, "float f = fetch1();"
 			"_out.r = f;"
 			"_out.a = 1.0;",
@@ -499,6 +521,99 @@ struct SApp : App {
 				img(p) = glm::mix(img(p), 1.0f, (floatY - 0.5f) * 2);
 			}
 		}
+		return img;
+	}
+	Img update_1_scale_grayScott(Img aImg)
+	{
+		auto img = aImg.clone();
+
+		auto tex = gtex(img);
+		gl::TextureRef gradientsTex;
+		//gradientsTex = get_gradients_tex_v2(tex, GL_REPEAT, GL_CLAMP_TO_EDGE);
+		gradientsTex = get_gradients_tex_v3(tex, GL_REPEAT, GL_CLAMP_TO_EDGE);
+
+		struct Maps {
+			gl::TextureRef
+				change, // velocity of change
+				a,
+				b;
+		};
+		static std::map<glm::ivec2, Maps, compareVec<int>> mapsCache;
+		auto accTex = shade2(tex, gradientsTex, // acceleration
+			"vec2 grad = fetch2(tex2);"
+			"vec2 dir = perpLeft(safeNormalized(grad));"
+			""
+			"float val = fetch1();"
+			"float valLeft = fetch1(tex, tc + tsize * dir);"
+			"float valRight = fetch1(tex, tc - tsize * dir);"
+			"float add = (val - (valLeft + valRight) * .5f);"
+			//"if(add < 0.0) add = 0;"
+			"_out.r = add * abc*0.01;"
+			, ShadeOpts().uniform("abc", abc),
+			"vec2 perpLeft(vec2 v) {"
+			"	return vec2(-v.y, v.x);"
+			"}"
+		);
+		if (mapsCache.find(tex->getSize()) == mapsCache.end()) {
+			Maps maps;
+			maps.a = shade2(tex, "_out.r = 1.0;");
+			maps.b = shade2(tex, "_out.r = 0.0;");
+			mapsCache[tex->getSize()] = maps;
+		}
+
+		const float dA = cfg2::getFloat("RD dA", .02, 0.068, 20, 1.0, ImGuiSliderFlags_Logarithmic);
+		const float dB = cfg2::getFloat("RD dB", .02, 0.068, 20, 0.5, ImGuiSliderFlags_Logarithmic);
+		const float F = cfg2::getFloat("RD F", .02, 0.068, 20, 0.055, ImGuiSliderFlags_Logarithmic);
+		const float K = cfg2::getFloat("RD K", .02, 0.068, 20, 0.062, ImGuiSliderFlags_Logarithmic);
+		const float dt = cfg2::getFloat("RD dt", .02, 0.068, 20, 1.0, ImGuiSliderFlags_Logarithmic);
+		const float connection = cfg2::getFloat("RD connection", .02, 0.068, 20, 20.0, ImGuiSliderFlags_Logarithmic);
+
+		auto& maps = mapsCache[tex->getSize()];
+		maps.b = op(maps.b) + op(accTex) * connection;
+		auto aLaplace = get_laplace_tex(maps.a, GL_CLAMP_TO_EDGE);
+		auto bLaplace = get_laplace_tex(maps.b, GL_CLAMP_TO_EDGE);
+		auto reaction = op(maps.a) * maps.b * maps.b;
+		auto newA = op(maps.a) + (op(aLaplace) * dA - reaction - (op(maps.a) - 1.0) * F) * dt;
+		auto newB = op(maps.b) + (op(bLaplace) * dB + reaction - op(maps.b) * (K + F)) * dt;
+		maps.a = newA;
+		maps.b = newB;
+		tex = maps.b;
+		//tex = shade2(tex, "_out.r = 0.01*fetch1();");
+		//changeTex = op(changeTex) + accTex;
+		//tex = op(tex) + changeTex;
+
+
+		auto texb = tex;
+		//for (int i = 0; i < 3; i++) {
+			texb->setWrap(GL_REPEAT, GL_CLAMP_TO_EDGE);
+			texb = gauss3tex(texb);
+		//}
+		
+		tex = shade2(tex, texb,
+			"float f = fetch1();"
+			"float fb = fetch1(tex2);"
+			"_out.r = mix(f, fb, .8f);"
+		);
+		img = gettexdata<float>(tex, GL_RED, GL_FLOAT);
+		//img = ::to01(img);
+
+		float sum = ::accumulate(img.begin(), img.end(), 0.0f);
+		float avg = sum / (float)img.area;
+		forxy(img)
+		{
+			img(p) += .5f - avg;
+		}
+		/*forxy(img) {
+			float floatY = p.y / (float)img.h;
+			floatY = glm::mix(blendWeaken, 1.0f - blendWeaken, floatY);
+			floatY = std::max(0.0f, std::min(1.0f, floatY));
+			if (floatY < .5) {
+				img(p) *= floatY * 2;
+			}
+			else {
+				img(p) = glm::mix(img(p), 1.0f, (floatY - 0.5f) * 2);
+			}
+		}*/
 		return img;
 	}
 	Img multiscaleApply(Img src, function<Img(Img)> func) {
@@ -570,8 +685,8 @@ struct SApp : App {
 		if (pause2) {
 			return;
 		}
-		img = multiscaleApply(img, [this](auto arg) { return update_1_scale(arg); });
-		//img = update_1_scale(img);
+		//img = multiscaleApply(img, [this](auto arg) { return update_1_scale(arg); });
+		img = update_1_scale_grayScott(img);
 
 		forxy(img) {
 			auto& c = img(p);

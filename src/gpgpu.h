@@ -58,22 +58,18 @@ struct Operable {
 	Operable operator-(gl::TextureRef other);
 	Operable operator*(gl::TextureRef other);
 	Operable operator/(gl::TextureRef other);
-	/*Operable operator+(float scalar) {
-		globaldict["scalar"] = scalar;
-		return Operable(shade2(tex, "_out.r = fetch1() + scalar;"));
+	Operable operator+(float scalar) {
+		return Operable(shade2(tex, "_out.r = fetch1() + scalar;", ShadeOpts().uniform("scalar", scalar)));
 	}
 	Operable operator-(float scalar) {
-		globaldict["scalar"] = scalar;
-		return Operable(shade2(tex, "_out.r = fetch1() - scalar;"));
+		return Operable(shade2(tex, "_out.r = fetch1() - scalar;", ShadeOpts().uniform("scalar", scalar)));
 	}
 	Operable operator*(float scalar) {
-		globaldict["scalar"] = scalar;
-		return Operable(shade2(tex, "_out.r = fetch1() * scalar;"));
+		return Operable(shade2(tex, "_out.r = fetch1() * scalar;", ShadeOpts().uniform("scalar", scalar)));
 	}
 	Operable operator/(float scalar) {
-		globaldict["scalar"] = scalar;
-		return Operable(shade2(tex, "_out.r = fetch1() / scalar;"));
-	}*/
+		return Operable(shade2(tex, "_out.r = fetch1() / scalar;", ShadeOpts().uniform("scalar", scalar)));
+	}
 	void operator+=(gl::TextureRef other);
 	void operator-=(gl::TextureRef other);
 	void operator*=(gl::TextureRef other);
