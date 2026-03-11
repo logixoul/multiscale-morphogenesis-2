@@ -158,6 +158,7 @@ struct SApp : App {
 	}
 
 	typedef Array2D<float> Img;
+#if 0
 	Img update_1_scale(Img aImg)
 	{
 		auto img = aImg.clone();
@@ -232,6 +233,7 @@ struct SApp : App {
 		}
 		return img;
 	}
+#endif
 	Img update_1_scale_v2_cleanedUp(Img aImg)
 	{
 		auto img = aImg.clone();
@@ -257,10 +259,7 @@ struct SApp : App {
 				//img2(p) = add * abc;
 			}
 		}
-		auto tex = gtex(img2);
-		tex->setWrap(GL_REPEAT, GL_CLAMP_TO_EDGE);
-		tex = gauss3tex(tex);
-		img = gettexdata<float>(tex, GL_RED, GL_FLOAT);
+		img = gauss3Better<float, WrapModes::GetClamped>(img2);
 		
 		if (blendWeaken != 0.5f) {
 			forxy(img) {
@@ -276,6 +275,17 @@ struct SApp : App {
 			}
 		}
 		return img;
+	}
+	template<class T, class FetchFunc>
+	static Array2D<T> gauss3Better(Array2D<T> src) {
+		T zero = ::zero<T>();
+		Array2D<T> dst1(src.w, src.h);
+		Array2D<T> dst2(src.w, src.h);
+		forxy(dst1)
+			dst1(p) = .25f * (2 * FetchFunc::fetch(src, p.x, p.y) + FetchFunc::fetch(src, p.x - 1, p.y) + FetchFunc::fetch(src, p.x + 1, p.y));
+		forxy(dst2)
+			dst2(p) = .25f * (2 * FetchFunc::fetch(dst1, p.x, p.y) + FetchFunc::fetch(dst1, p.x, p.y - 1) + FetchFunc::fetch(dst1, p.x, p.y + 1));
+		return dst2;
 	}
 
 	Img multiscaleApply(Img src, function<Img(Img)> func) {
@@ -294,44 +304,30 @@ struct SApp : App {
 		for (auto& s : origScales) s = s.clone();
 		int lastLevel = 0;
 		for (int i = scales.size() - 1; i >= lastLevel; i--) {
-			//texs[i] = gtex(scales[i]);
 			auto& thisScale = scales[i];
 			auto& thisOrigScale = origScales[i];
 			auto transformed = func(thisScale);
 			auto diff = empty_like(transformed);
-			sw::timeit("::map", [&]() {
-#pragma omp parallel for
-				for (int j = 0; j < diff.area; j++) {
-					diff.data[j] = transformed.data[j] - thisOrigScale.data[j];
-				}
-				});
-			//float w = 1.0f - pow(i / float(scales.size() - 1), weightFactor);
-			//w = std::max(0.0f, std::min(1.0f, w));
+			for (int j = 0; j < diff.area; j++) {
+				diff.data[j] = transformed.data[j] - thisOrigScale.data[j];
+			}
 			float iNormalized = -1+2*i / float(scales.size() - 1);
 			float w = exp(weightFactor*iNormalized);
-			sw::timeit("2 loops", [&]() {
-				forxy(diff) {
-					diff(p) *= w;
-				}
-				});
+			forxy(diff) {
+				diff(p) *= w;
+			}
 			if (i == lastLevel)
 			{
-				sw::timeit("::map", [&]() {
-#pragma omp parallel for
-					for (int j = 0; j < transformed.area; j++) {
-						scales[lastLevel].data[j] = thisOrigScale.data[j] + diff.data[j];//.clone();
-					}
-					});
+				for (int j = 0; j < transformed.area; j++) {
+					scales[lastLevel].data[j] = thisOrigScale.data[j] + diff.data[j];//.clone();
+				}
 				break;
 			}
 			auto& nextScaleUp = scales[i - 1];
-			//texs[i] = gtex(::resize(transformed, nextScaleUp.Size(), filter));
 			auto upscaledDiff = ::resize(diff, nextScaleUp.Size(), filter);
-			sw::timeit("2 loops", [&]() {
-				forxy(nextScaleUp) {
-					nextScaleUp(p) += upscaledDiff(p);
-				}
-				});
+			forxy(nextScaleUp) {
+				nextScaleUp(p) += upscaledDiff(p);
+			}
 		}
 		return scales[lastLevel];
 	}
