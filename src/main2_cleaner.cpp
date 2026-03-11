@@ -168,7 +168,30 @@ struct SApp : App {
 		gradientsTex = get_gradients_tex_v3(tex, GL_REPEAT, GL_CLAMP_TO_EDGE);
 
 		static std::map<glm::ivec2, gl::TextureRef, compareVec<int>> changeMap; // velocity of change
-		auto accTex = shade2(tex, gradientsTex, // acceleration
+		auto gradients = dl<vec2>(gradientsTex);
+		static const auto perpLeft = [&](vec2 v) { return vec2(-v.y, v.x); }; //correct
+		auto guidance = img;
+		auto img2 = ::zeros_like(img);
+		for (int x = 0; x < img.w; x++)
+		{
+			for (int y = 0; y < img.h; y++)
+			{
+				vec2 p = vec2(x, y);
+				vec2 grad = safeNormalized(gradients(x, y));
+
+				vec2 gradP = perpLeft(grad);
+
+				float val = guidance(x, y);
+				float valLeft = getBilinear<float, WrapModes::GetClamped>(guidance, p + gradP);
+				float valRight = getBilinear<float, WrapModes::GetClamped>(guidance, p - gradP);
+				float add = (val - (valLeft + valRight) * .5f);
+				//aaPoint<float, WrapModes::GetWrapped>(img2, p - grad * abc, add * abc);
+				aaPoint<float, WrapModes::GetWrapped>(img2, p - grad * abc, add * abc);
+				//img2(p) = add * abc;
+			}
+		}
+		auto accTex = gtex(img2);
+		/*auto accTex = shade2(tex, gradientsTex, // acceleration
 			"vec2 grad = fetch2(tex2);"
 			"vec2 dir = perpLeft(safeNormalized(grad));"
 			""
@@ -181,12 +204,12 @@ struct SApp : App {
 			"vec2 perpLeft(vec2 v) {"
 			"	return vec2(-v.y, v.x);"
 			"}"
-		);
+		);*/
 		if (changeMap.find(tex->getSize()) == changeMap.end()) {
 			changeMap[tex->getSize()] = maketex(tex->getWidth(), tex->getHeight(), GL_R16F, false, true);
 		}
 		auto changeTex = changeMap[tex->getSize()];
-		changeTex = op(changeTex) + accTex;
+		changeTex = op(changeTex) *0.0+ accTex;
 		tex = op(tex) + changeTex;
 
 
@@ -285,24 +308,29 @@ struct SApp : App {
 	float contrastizeFactor;
 	float blendWeaken;
 	float weightFactor;
+	
 	void stefanUpdate() {
 		abc = cfg2::getFloat("morphogenesis", .02, 0.068, 20, 2.418, ImGuiSliderFlags_Logarithmic);
-		contrastizeFactor = cfg2::getFloat("contrastizeFactor", 1.f, 0.01, 100, 0.01f, ImGuiSliderFlags_Logarithmic);
+		contrastizeFactor = cfg2::getFloat("contrastizeFactor", 1.f, 0.0, 10, 0.0f, ImGuiSliderFlags_None);
 		blendWeaken = cfg2::getFloat("blendWeaken", 0.01f, 0.1, .499, .499f);
 		weightFactor = cfg2::getFloat("weightFactor", 0.1f, 0.1, 30, 30, ImGuiSliderFlags_Logarithmic);
+		float multiscale = cfg2::getBool("multiscale", false);
 
 		if (pause2) {
 			return;
 		}
-		img = multiscaleApply(img, [this](auto arg) { return update_1_scale(arg); });
+		if(multiscale)
+			img = multiscaleApply(img, [this](auto arg) { return update_1_scale(arg); });
+		else
+			img = update_1_scale(img);
 
-		/*forxy(img) {
+		forxy(img) {
 			auto& c = img(p);
 			c = ci::constrain(c, 0.0f, 1.0f);
 			auto c2 = 3.0f * c * c - 2.0f * c * c * c;
 			c = mix(c, c2, contrastizeFactor);
 			c = ci::constrain(c, 0.0f, 1.0f);
-		}*/
+		}
 
 	}
 	void stefanDraw()
