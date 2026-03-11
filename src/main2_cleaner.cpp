@@ -246,7 +246,7 @@ struct SApp : App {
 		vector<Img> scales;
 		auto filter = ci::FilterGaussian();
 		
-		while (size > 2)
+		while (size > 8)
 		{
 			scales.push_back(state);
 			state = ::resize(state, state.Size() / 2, filter);
@@ -267,9 +267,9 @@ struct SApp : App {
 					diff.data[j] = transformed.data[j] - thisOrigScale.data[j];
 				}
 				});
-			float w = 1.0f - pow(i / float(scales.size() - 1), weightFactor);
-			w = std::max(0.0f, std::min(1.0f, w));
-			//float w = exp(-3+6*i / float(scales.size() - 1));
+			//float w = 1.0f - pow(i / float(scales.size() - 1), weightFactor);
+			//w = std::max(0.0f, std::min(1.0f, w));
+			float w = weightFactor*exp(-1+2*i / float(scales.size() - 1));
 			sw::timeit("2 loops", [&]() {
 				forxy(diff) {
 					diff(p) *= w;
@@ -306,8 +306,8 @@ struct SApp : App {
 		contrastizeFactor = cfg2::getFloat("contrastizeFactor", 0.1f, 0.0, 10, 0.0f);
 		blendWeaken = cfg2::getFloat("blendWeaken", 0.01f, 0.1, .5f, .45f);
 		weightFactor = cfg2::getFloat("weightFactor", 0.1f, 0.1, 60.0f, 30, ImGuiSliderFlags_Logarithmic);
-		float multiscale = cfg2::getBool("multiscale", true);
-
+		bool multiscale = cfg2::getBool("multiscale", true);
+		
 		if (pause2) {
 			return;
 		}
@@ -319,9 +319,20 @@ struct SApp : App {
 		forxy(img) {
 			auto& c = img(p);
 			c = ci::constrain(c, 0.0f, 1.0f);
-			auto c2 = 3.0f * c * c - 2.0f * c * c * c;
-			c = mix(c, c2, contrastizeFactor);
-			c = ci::constrain(c, 0.0f, 1.0f);
+			if(c < .5f) {
+				c *= 2.0f;
+				c = pow(c, 1.0f - contrastizeFactor);
+				c *= .5f;
+			}
+			else {
+				c = (c - .5f) * 2.0f;
+				c = pow(c, 1.0f - contrastizeFactor);
+				c *= .5f;
+				c += .5f;
+			}
+			//auto c2 = 3.0f * c * c - 2.0f * c * c * c;
+			//c = mix(c, c2, contrastizeFactor);
+			//c = ci::constrain(c, 0.0f, 1.0f);
 		}
 
 	}
