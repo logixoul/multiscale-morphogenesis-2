@@ -48,65 +48,6 @@ gl::TextureRef redToLuminance(gl::TextureRef const& in) {
 	);
 }
 
-inline Array2D<float> to01_Cut(Array2D<float> in) {
-	Array2D<float> tmp = in.clone();
-	std::sort(tmp.begin(), tmp.end());
-	//float div = constrain<float>(mouseX * 100, 1, 100);
-	float div = 100;
-	float minn = tmp.data[int(tmp.area / div)];
-	float maxx = tmp.data[int(tmp.area - 1 - tmp.area / div)];
-	auto result = in.clone();
-	forxy(result) {
-		result(p) -= minn;
-		result(p) /= (maxx - minn);
-		result(p) = constrain<float>(result(p), 0, 1);
-	}
-	return result;
-}
-
-gl::TextureRef get_gradients_tex_v2(gl::TextureRef src, GLuint wrapS, GLuint wrapT) {
-	GPU_SCOPE("get_gradients_tex");
-	glActiveTexture(GL_TEXTURE0);
-	::bindTexture(src);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrapS);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrapT);
-	return shade2(src,
-		"	float srcL=fetch1(tex,tc+tsize*vec2(-1.0,0.0));"
-		"	float srcR=fetch1(tex,tc+tsize*vec2(1.0,0.0));"
-		"	float srcT=fetch1(tex,tc+tsize*vec2(0.0,-1.0));"
-		"	float srcB=fetch1(tex,tc+tsize*vec2(0.0,1.0));"
-		"	float dx=(srcR-srcL)/2.0;"
-		"	float dy=(srcB-srcT)/2.0;"
-		"	_out.xy=vec2(dx,dy);"
-		,
-		ShadeOpts().ifmt(GL_RG16F)
-	);
-}
-
-gl::TextureRef get_gradients_tex_v3(gl::TextureRef src, GLuint wrapS, GLuint wrapT) {
-	GPU_SCOPE("get_gradients_tex");
-	glActiveTexture(GL_TEXTURE0);
-	::bindTexture(src);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrapS);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrapT);
-	return shade2(src,
-		// Sobel 3x3 kernel for X and Y
-		"float nw = fetch1(tex, tc + tsize * vec2(-1.0, -1.0));"
-		"float n  = fetch1(tex, tc + tsize * vec2(0.0, -1.0));"
-		"float ne = fetch1(tex, tc + tsize * vec2(1.0, -1.0));"
-		"float w  = fetch1(tex, tc + tsize * vec2(-1.0, 0.0));"
-		"float e  = fetch1(tex, tc + tsize * vec2(1.0, 0.0));"
-		"float sw = fetch1(tex, tc + tsize * vec2(-1.0, 1.0));"
-		"float s  = fetch1(tex, tc + tsize * vec2(0.0, 1.0));"
-		"float se = fetch1(tex, tc + tsize * vec2(1.0, 1.0));"
-		"float gx = (ne + 2.0 * e + se) - (nw + 2.0 * w + sw);"
-		"float gy = (sw + 2.0 * s + se) - (nw + 2.0 * n + ne);"
-		// normalize by 8 (sum of absolute kernel weights) to keep scale similar to central differences
-		"_out.xy = vec2(gx, gy) / 8.0;",
-		ShadeOpts().ifmt(GL_RG16F)
-	);
-}
-
 int wsx = 700, wsy = 700;
 int sx = 256;
 int sy = 256;
@@ -157,88 +98,10 @@ struct SApp : App {
 		}
 	}
 
-	typedef Array2D<float> Img;
-#if 0
-	Img update_1_scale(Img aImg)
+	Array2D<float> updateSingleScale(Array2D<float> aImg)
 	{
 		auto img = aImg.clone();
 
-		auto tex = gtex(img);
-		gl::TextureRef gradientsTex;
-		//gradientsTex = get_gradients_tex_v2(tex, GL_REPEAT, GL_CLAMP_TO_EDGE);
-		gradientsTex = get_gradients_tex_v3(tex, GL_REPEAT, GL_CLAMP_TO_EDGE);
-
-		static std::map<glm::ivec2, gl::TextureRef, compareVec<int>> changeMap; // velocity of change
-		auto gradients = dl<vec2>(gradientsTex);
-		static const auto perpLeft = [&](vec2 v) { return vec2(-v.y, v.x); }; //correct
-		auto guidance = img;
-		auto img2 = ::zeros_like(img);
-		for (int x = 0; x < img.w; x++)
-		{
-			for (int y = 0; y < img.h; y++)
-			{
-				vec2 p = vec2(x, y);
-				vec2 grad = safeNormalized(gradients(x, y));
-
-				vec2 gradP = perpLeft(grad);
-
-				float val = guidance(x, y);
-				float valLeft = getBilinear<float, WrapModes::GetClamped>(guidance, p + gradP);
-				float valRight = getBilinear<float, WrapModes::GetClamped>(guidance, p - gradP);
-				float add = (val - (valLeft + valRight) * .5f);
-				aaPoint<float, WrapModes::GetWrapped>(img2, p - grad * std::max(0.0f, add), add * abc);
-				//img2(p) = add * abc;
-			}
-		}
-		auto accTex = gtex(img2);
-		/*auto accTex = shade2(tex, gradientsTex, // acceleration
-			"vec2 grad = fetch2(tex2);"
-			"vec2 dir = perpLeft(safeNormalized(grad));"
-			""
-			"float val = fetch1();"
-			"float valLeft = fetch1(tex, tc + tsize * dir);"
-			"float valRight = fetch1(tex, tc - tsize * dir);"
-			"float add = (val - (valLeft + valRight) * .5f);"
-			"_out.r = add * abc;"
-			, ShadeOpts().uniform("abc", abc),
-			"vec2 perpLeft(vec2 v) {"
-			"	return vec2(-v.y, v.x);"
-			"}"
-		);*/
-		if (changeMap.find(tex->getSize()) == changeMap.end()) {
-			changeMap[tex->getSize()] = maketex(tex->getWidth(), tex->getHeight(), GL_R16F, false, true);
-		}
-		auto changeTex = changeMap[tex->getSize()];
-		changeTex = op(changeTex) * .0f + accTex;
-		tex = op(tex) + changeTex;
-
-
-		tex->setWrap(GL_REPEAT, GL_CLAMP_TO_EDGE);
-		tex = gauss3tex(tex);
-		img = gettexdata<float>(tex, GL_RED, GL_FLOAT);
-		//img = ::to01(img);
-
-		if (blendWeaken != 0.5f) {
-			forxy(img) {
-				float floatY = p.y / (float)img.h;
-				floatY = glm::mix(blendWeaken, 1.0f - blendWeaken, floatY);
-				floatY = std::max(0.0f, std::min(1.0f, floatY));
-				if (floatY < .5) {
-					img(p) *= floatY * 2;
-				}
-				else {
-					img(p) = glm::mix(img(p), 1.0f, (floatY - 0.5f) * 2);
-				}
-			}
-		}
-		return img;
-	}
-#endif
-	Img update_1_scale_v2_cleanedUp(Img aImg)
-	{
-		auto img = aImg.clone();
-
-		
 		auto gradients = ::get_gradients<float, WrapModes::GetClamped>(img);
 		static const auto perpLeft = [&](vec2 v) { return vec2(-v.y, v.x); };
 		auto img2 = img.clone();
@@ -255,23 +118,20 @@ struct SApp : App {
 				float valLeft = getBilinear<float, WrapModes::GetClamped>(img, p + gradP);
 				float valRight = getBilinear<float, WrapModes::GetClamped>(img, p - gradP);
 				float add = (val - (valLeft + valRight) * .5f);
-				aaPoint<float, WrapModes::GetWrapped>(img2, p - grad * std::max(0.0f, add), add * abc);
-				//img2(p) = add * abc;
+				float addAbs = abs(add);
+				aaPoint<float, WrapModes::GetClamped>(img2, p - grad * addAbs, add * abc);
 			}
 		}
 		img = gauss3Better<float, WrapModes::GetClamped>(img2);
 		
-		if (blendWeaken != 0.5f) {
-			forxy(img) {
-				float floatY = p.y / (float)img.h;
-				floatY = glm::mix(blendWeaken, 1.0f - blendWeaken, floatY);
-				floatY = std::max(0.0f, std::min(1.0f, floatY));
-				if (floatY < .5) {
-					img(p) *= floatY * 2;
-				}
-				else {
-					img(p) = glm::mix(img(p), 1.0f, (floatY - 0.5f) * 2);
-				}
+		forxy(img) {
+			float floatY = p.y / (float)img.h;
+			floatY = glm::mix(blendWeaken, 1.0f - blendWeaken, floatY);
+			if (floatY < .5) {
+				img(p) *= floatY * 2;
+			}
+			else {
+				img(p) = glm::mix(img(p), 1.0f, (floatY - 0.5f) * 2);
 			}
 		}
 		return img;
@@ -287,7 +147,7 @@ struct SApp : App {
 			dst2(p) = .25f * (2 * FetchFunc::fetch(dst1, p.x, p.y) + FetchFunc::fetch(dst1, p.x, p.y - 1) + FetchFunc::fetch(dst1, p.x, p.y + 1));
 		return dst2;
 	}
-
+	using Img = Array2D<float>;
 	Img multiscaleApply(Img src, function<Img(Img)> func) {
 		int size = std::min(src.w, src.h);
 		auto state = src.clone();
@@ -347,9 +207,9 @@ struct SApp : App {
 			return;
 		}
 		if(multiscale)
-			img = multiscaleApply(img, [this](auto arg) { return update_1_scale_v2_cleanedUp(arg); });
+			img = multiscaleApply(img, [this](auto arg) { return updateSingleScale(arg); });
 		else
-			img = update_1_scale_v2_cleanedUp(img);
+			img = updateSingleScale(img);
 
 		img = to01(img);
 		if(0)forxy(img) {
