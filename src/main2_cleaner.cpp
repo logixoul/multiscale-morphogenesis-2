@@ -209,22 +209,12 @@ struct SApp : App {
 			changeMap[tex->getSize()] = maketex(tex->getWidth(), tex->getHeight(), GL_R16F, false, true);
 		}
 		auto changeTex = changeMap[tex->getSize()];
-		changeTex = op(changeTex) *0.0+ accTex;
+		changeTex = op(changeTex) + accTex;
 		tex = op(tex) + changeTex;
 
 
-		auto texb = tex;
-		for (int i = 0; i < 3; i++) {
-			texb->setWrap(GL_REPEAT, GL_CLAMP_TO_EDGE);
-			texb = gauss3tex(texb);
-		}
-		//tex = texb;
-
-		tex = shade2(tex, texb,
-			"float f = fetch1();"
-			"float fb = fetch1(tex2);"
-			"_out.r = mix(f, fb, .8f);"
-		);
+		tex->setWrap(GL_REPEAT, GL_CLAMP_TO_EDGE);
+		tex = gauss3tex(tex);
 		img = gettexdata<float>(tex, GL_RED, GL_FLOAT);
 		//img = ::to01(img);
 
@@ -312,9 +302,9 @@ struct SApp : App {
 	float weightFactor;
 	
 	void stefanUpdate() {
-		abc = cfg2::getFloat("morphogenesis", .02, 0.068, 20, 2.418, ImGuiSliderFlags_Logarithmic);
-		contrastizeFactor = cfg2::getFloat("contrastizeFactor", 0.1f, 0.0, 10, 0.8f);
-		blendWeaken = cfg2::getFloat("blendWeaken", 0.01f, 0.1, .5f, .48f);
+		abc = cfg2::getFloat("morphogenesis", .02, 0.068, 20, 1.35, ImGuiSliderFlags_Logarithmic);
+		contrastizeFactor = cfg2::getFloat("contrastizeFactor", 0.1f, 0.0, 10, 0.0f);
+		blendWeaken = cfg2::getFloat("blendWeaken", 0.01f, 0.1, .5f, .45f);
 		weightFactor = cfg2::getFloat("weightFactor", 0.1f, 0.1, 60.0f, 30, ImGuiSliderFlags_Logarithmic);
 		float multiscale = cfg2::getBool("multiscale", true);
 
