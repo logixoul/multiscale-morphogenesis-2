@@ -185,11 +185,8 @@ struct SApp : App {
 				float valLeft = getBilinear<float, WrapModes::GetClamped>(guidance, p + gradP);
 				float valRight = getBilinear<float, WrapModes::GetClamped>(guidance, p - gradP);
 				float add = (val - (valLeft + valRight) * .5f);
-				//aaPoint<float, WrapModes::GetWrapped>(img2, p - grad * abc, add * abc);
-				//float offset = add > 0;
-				//float add01 = sign(add) * (addAbs / (addAbs + 1.0f));
-				//aaPoint<float, WrapModes::GetWrapped>(img2, p - grad * add, add * abc);
-				img2(p) = add * abc;
+				aaPoint<float, WrapModes::GetWrapped>(img2, p - grad * std::max(0.0f, add), add * abc);
+				//img2(p) = add * abc;
 			}
 		}
 		auto accTex = gtex(img2);
@@ -220,6 +217,51 @@ struct SApp : App {
 		img = gettexdata<float>(tex, GL_RED, GL_FLOAT);
 		//img = ::to01(img);
 
+		if (blendWeaken != 0.5f) {
+			forxy(img) {
+				float floatY = p.y / (float)img.h;
+				floatY = glm::mix(blendWeaken, 1.0f - blendWeaken, floatY);
+				floatY = std::max(0.0f, std::min(1.0f, floatY));
+				if (floatY < .5) {
+					img(p) *= floatY * 2;
+				}
+				else {
+					img(p) = glm::mix(img(p), 1.0f, (floatY - 0.5f) * 2);
+				}
+			}
+		}
+		return img;
+	}
+	Img update_1_scale_v2_cleanedUp(Img aImg)
+	{
+		auto img = aImg.clone();
+
+		
+		auto gradients = ::get_gradients<float, WrapModes::GetClamped>(img);
+		static const auto perpLeft = [&](vec2 v) { return vec2(-v.y, v.x); };
+		auto img2 = img.clone();
+		for (int x = 0; x < img.w; x++)
+		{
+			for (int y = 0; y < img.h; y++)
+			{
+				vec2 p = vec2(x, y);
+				vec2 grad = safeNormalized(gradients(x, y));
+
+				vec2 gradP = perpLeft(grad);
+
+				float val = img(x, y);
+				float valLeft = getBilinear<float, WrapModes::GetClamped>(img, p + gradP);
+				float valRight = getBilinear<float, WrapModes::GetClamped>(img, p - gradP);
+				float add = (val - (valLeft + valRight) * .5f);
+				aaPoint<float, WrapModes::GetWrapped>(img2, p - grad * std::max(0.0f, add), add * abc);
+				//img2(p) = add * abc;
+			}
+		}
+		auto tex = gtex(img2);
+		tex->setWrap(GL_REPEAT, GL_CLAMP_TO_EDGE);
+		tex = gauss3tex(tex);
+		img = gettexdata<float>(tex, GL_RED, GL_FLOAT);
+		
 		if (blendWeaken != 0.5f) {
 			forxy(img) {
 				float floatY = p.y / (float)img.h;
@@ -311,7 +353,7 @@ struct SApp : App {
 		if(multiscale)
 			img = multiscaleApply(img, [this](auto arg) { return update_1_scale(arg); });
 		else
-			img = update_1_scale(img);
+			img = update_1_scale_v2_cleanedUp(img);
 
 		img = to01(img);
 		if(0)forxy(img) {
