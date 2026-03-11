@@ -259,3 +259,139 @@ void doFluidStep() {
 		}
 	}
 };
+
+
+		/*auto gradients = dl<vec2>(gradientsTex);
+		static const auto perpLeft = [&](vec2 v) { return vec2(-v.y, v.x); }; //correct
+		auto guidance = img;
+		auto img2 = img.clone();
+		for (int x = 0; x < img.w; x++)
+		{
+			for (int y = 0; y < img.h; y++)
+			{
+				vec2 p = vec2(x, y);
+				vec2 grad = safeNormalized(gradients(x, y));
+
+				vec2 gradP = perpLeft(grad);
+
+				float val = guidance(x, y);
+				float valLeft = getBilinear<float, WrapModes::GetWrapped>(guidance, p + gradP);
+				float valRight = getBilinear<float, WrapModes::GetWrapped>(guidance, p - gradP);
+				float add = (val - (valLeft + valRight) * .5f);
+				if (add < 0.0)
+					add = 0;
+				aaPoint<float, WrapModes::GetWrapped>(img2, p - grad, add * abc);
+				//img2(p) += add * abc;
+			}
+		}*/
+
+
+
+	Img update_1_scale_grayScott(Img aImg)
+	{
+		//std::this_thread::sleep_for(std::chrono::milliseconds(10));
+		auto img = aImg.clone();
+
+		auto tex = gtex(img);
+		gl::TextureRef gradientsTex;
+		//gradientsTex = get_gradients_tex_v2(tex, GL_REPEAT, GL_CLAMP_TO_EDGE);
+		gradientsTex = get_gradients_tex_v3(tex, GL_REPEAT, GL_REPEAT);
+
+		struct Maps {
+			gl::TextureRef
+				change, // velocity of change
+				a,
+				b;
+		};
+		static std::map<glm::ivec2, Maps, compareVec<int>> mapsCache;
+		auto accTex = shade2(tex, gradientsTex, // acceleration
+			"vec2 grad = fetch2(tex2);"
+			"vec2 dir = perpLeft(safeNormalized(grad));"
+			""
+			"float val = fetch1();"
+			"float valLeft = fetch1(tex, tc + tsize * dir);"
+			"float valRight = fetch1(tex, tc - tsize * dir);"
+			"float add = (val - (valLeft + valRight) * .5f);"
+			//"if(add < 0.0) add = 0;"
+			"_out.r = add * abc*0.001;"
+			, ShadeOpts().uniform("abc", abc),
+			"vec2 perpLeft(vec2 v) {"
+			"	return vec2(-v.y, v.x);"
+			"}"
+		);
+		if (mapsCache.find(tex->getSize()) == mapsCache.end()) {
+			Maps maps;
+			maps.a = gtex(this->getRandomCircle(1.0));
+			maps.b = gtex(this->getRandomCircle(0.0));
+			//maps.a = shade2(tex, "_out.r = distance(vec2(.5), tc)) < .2 ? 1.0;");
+			//maps.b = shade2(tex, "_out.r = 0.0;");
+			mapsCache[tex->getSize()] = maps;
+		}
+
+		const float dA = cfg2::getFloat("RD dA", .02, 0.068, 20, 0.2, ImGuiSliderFlags_Logarithmic);
+		const float dB = cfg2::getFloat("RD dB", .02, 0.068, 20, 0.1, ImGuiSliderFlags_Logarithmic);
+		const float F = cfg2::getFloat("RD F", .02, 0.068, 20, 0.025, ImGuiSliderFlags_Logarithmic);
+		const float K = cfg2::getFloat("RD K", .02, 0.068, 20, 0.056, ImGuiSliderFlags_Logarithmic);
+		const float dt = cfg2::getFloat("RD dt", .02, 0.068, 20, 1.0, ImGuiSliderFlags_Logarithmic);
+		const float connection = cfg2::getFloat("RD connection", .02, 0.068, 20, 2.0, ImGuiSliderFlags_Logarithmic);
+
+		auto& maps = mapsCache[tex->getSize()];
+		maps.b = op(tex);// -op(accTex) * connection;
+		auto aLaplace = get_laplace_tex(maps.a, GL_REPEAT);
+		auto bLaplace = get_laplace_tex(maps.b, GL_REPEAT);
+		auto reaction = op(maps.a) * maps.b * maps.b;
+		auto newA = shade2(maps.a, aLaplace, reaction,
+			"float a = fetch1(); float aLaplace = fetch1(tex2); float reaction = fetch1(tex3);"
+			"_out.r = a + (dA * aLaplace - reaction + F * (1.0 - a)) * dt;"
+			, ShadeOpts().uniform("dA", dA).uniform("F", F).uniform("dt", dt));
+		auto newB = shade2(maps.b, bLaplace, reaction,
+			"float b = fetch1(); float bLaplace = fetch1(tex2); float reaction = fetch1(tex3);"
+			"_out.r = b + (dB * bLaplace + reaction - (F + K) * b) * dt;"
+			, ShadeOpts().uniform("dB", dB).uniform("F", F).uniform("K", K).uniform("dt", dt));
+		maps.a = newA;
+		maps.b = newB;
+		maps.a->setWrap(GL_REPEAT, GL_REPEAT);
+		//maps.a = gauss3tex(maps.a);
+		maps.b->setWrap(GL_REPEAT, GL_REPEAT);
+		//maps.b = gauss3tex(maps.b);
+
+		tex = maps.b;
+		//tex = shade2(tex, "_out.r = 0.01*fetch1();");
+		//changeTex = op(changeTex) + accTex;
+		//tex = op(tex) + changeTex;
+
+
+		auto texb = tex;
+		//for (int i = 0; i < 3; i++) {
+			//texb->setWrap(GL_REPEAT, GL_REPEAT);
+			//texb = gauss3tex(texb);
+		//}
+		
+		/*tex = shade2(tex, texb,
+			"float f = fetch1();"
+			"float fb = fetch1(tex2);"
+			"_out.r = mix(f, fb, .8f);"
+		);*/
+		img = gettexdata<float>(tex, GL_RED, GL_FLOAT);
+		::mm("img", img);
+		//img = to01_safe(img);
+
+		float sum = ::accumulate(img.begin(), img.end(), 0.0f);
+		float avg = sum / (float)img.area;
+		forxy(img)
+		{
+			//img(p) += .5f - avg;
+		}
+		/*forxy(img) {
+			float floatY = p.y / (float)img.h;
+			floatY = glm::mix(blendWeaken, 1.0f - blendWeaken, floatY);
+			floatY = std::max(0.0f, std::min(1.0f, floatY));
+			if (floatY < .5) {
+				img(p) *= floatY * 2;
+			}
+			else {
+				img(p) = glm::mix(img(p), 1.0f, (floatY - 0.5f) * 2);
+			}
+		}*/
+		return img;
+	}

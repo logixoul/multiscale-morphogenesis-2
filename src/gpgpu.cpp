@@ -140,12 +140,12 @@ gl::TextureRef get_laplace_tex(gl::TextureRef src, GLuint wrap) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap);
 	auto state = shade2(src,
 		"vec3 sum = vec3(0.0);"
-		"sum += fetch3(tex, tc + tsize * vec2(-1.0, 0.0)) * -1.0;"
-		"sum += fetch3(tex, tc + tsize * vec2(0.0, -1.0)) * -1.0;"
-		"sum += fetch3(tex, tc + tsize * vec2(0.0, +1.0)) * -1.0;"
-		"sum += fetch3(tex, tc + tsize * vec2(+1.0, 0.0)) * -1.0;"
-		"sum += fetch3(tex, tc + tsize * vec2(0.0, 0.0)) * 4.0;"
-		"_out.rgb = -sum / 4.0f;"
+		"sum += fetch3(tex, tc + tsize * vec2(-1.0, 0.0)) * 1.0;"
+		"sum += fetch3(tex, tc + tsize * vec2(0.0, -1.0)) * 1.0;"
+		"sum += fetch3(tex, tc + tsize * vec2(0.0, +1.0)) * 1.0;"
+		"sum += fetch3(tex, tc + tsize * vec2(+1.0, 0.0)) * 1.0;"
+		"sum += fetch3(tex, tc + tsize * vec2(0.0, 0.0)) * -4.0;"
+		"_out.rgb = sum;"
 		);
 	return state;
 }
