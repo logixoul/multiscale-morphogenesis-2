@@ -186,6 +186,8 @@ struct SApp : App {
 				float valRight = getBilinear<float, WrapModes::GetClamped>(guidance, p - gradP);
 				float add = (val - (valLeft + valRight) * .5f);
 				//aaPoint<float, WrapModes::GetWrapped>(img2, p - grad * abc, add * abc);
+				//float offset = add > 0;
+				//float add01 = sign(add) * (addAbs / (addAbs + 1.0f));
 				aaPoint<float, WrapModes::GetWrapped>(img2, p - grad * add, add * abc);
 				//img2(p) = add * abc;
 			}
@@ -269,7 +271,8 @@ struct SApp : App {
 				});
 			//float w = 1.0f - pow(i / float(scales.size() - 1), weightFactor);
 			//w = std::max(0.0f, std::min(1.0f, w));
-			float w = weightFactor*exp(-1+2*i / float(scales.size() - 1));
+			float iNormalized = -1+2*i / float(scales.size() - 1);
+			float w = exp(weightFactor*iNormalized);
 			sw::timeit("2 loops", [&]() {
 				forxy(diff) {
 					diff(p) *= w;
@@ -305,7 +308,7 @@ struct SApp : App {
 		abc = cfg2::getFloat("morphogenesis", .02, 0.068, 20, 1.35, ImGuiSliderFlags_Logarithmic);
 		contrastizeFactor = cfg2::getFloat("contrastizeFactor", 0.1f, 0.0, 10, 0.0f);
 		blendWeaken = cfg2::getFloat("blendWeaken", 0.01f, 0.1, .5f, .45f);
-		weightFactor = cfg2::getFloat("weightFactor", 0.1f, 0.1, 60.0f, 30, ImGuiSliderFlags_Logarithmic);
+		weightFactor = cfg2::getFloat("weightFactor", 0.1f, 0.1, 60.0f, 0.37, ImGuiSliderFlags_Logarithmic);
 		bool multiscale = cfg2::getBool("multiscale", true);
 		
 		if (pause2) {
