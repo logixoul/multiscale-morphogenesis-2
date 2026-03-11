@@ -188,8 +188,8 @@ struct SApp : App {
 				//aaPoint<float, WrapModes::GetWrapped>(img2, p - grad * abc, add * abc);
 				//float offset = add > 0;
 				//float add01 = sign(add) * (addAbs / (addAbs + 1.0f));
-				aaPoint<float, WrapModes::GetWrapped>(img2, p - grad * add, add * abc);
-				//img2(p) = add * abc;
+				//aaPoint<float, WrapModes::GetWrapped>(img2, p - grad * add, add * abc);
+				img2(p) = add * abc;
 			}
 		}
 		auto accTex = gtex(img2);
@@ -211,7 +211,7 @@ struct SApp : App {
 			changeMap[tex->getSize()] = maketex(tex->getWidth(), tex->getHeight(), GL_R16F, false, true);
 		}
 		auto changeTex = changeMap[tex->getSize()];
-		changeTex = op(changeTex) + accTex;
+		changeTex = op(changeTex) * .0f + accTex;
 		tex = op(tex) + changeTex;
 
 
@@ -220,12 +220,6 @@ struct SApp : App {
 		img = gettexdata<float>(tex, GL_RED, GL_FLOAT);
 		//img = ::to01(img);
 
-		float sum = ::accumulate(img.begin(), img.end(), 0.0f);
-		float avg = sum / (float)img.area;
-		forxy(img)
-		{
-			img(p) += .5f - avg;
-		}
 		if (blendWeaken != 0.5f) {
 			forxy(img) {
 				float floatY = p.y / (float)img.h;
@@ -248,7 +242,7 @@ struct SApp : App {
 		vector<Img> scales;
 		auto filter = ci::FilterGaussian();
 		
-		while (size > 8)
+		while (size > 2)
 		{
 			scales.push_back(state);
 			state = ::resize(state, state.Size() / 2, filter);
@@ -306,7 +300,7 @@ struct SApp : App {
 	
 	void stefanUpdate() {
 		abc = cfg2::getFloat("morphogenesis", .02, 0.068, 20, 1.35, ImGuiSliderFlags_Logarithmic);
-		contrastizeFactor = cfg2::getFloat("contrastizeFactor", 0.1f, 0.0, 10, 0.0f);
+		contrastizeFactor = cfg2::getFloat("contrastizeFactor", 0.01f, 1.0, 10, 1.0f);
 		blendWeaken = cfg2::getFloat("blendWeaken", 0.01f, 0.1, .5f, .45f);
 		weightFactor = cfg2::getFloat("weightFactor", 0.1f, 0.1, 60.0f, 0.37, ImGuiSliderFlags_Logarithmic);
 		bool multiscale = cfg2::getBool("multiscale", true);
@@ -319,25 +313,27 @@ struct SApp : App {
 		else
 			img = update_1_scale(img);
 
-		forxy(img) {
+		img = to01(img);
+		if(0)forxy(img) {
 			auto& c = img(p);
 			c = ci::constrain(c, 0.0f, 1.0f);
-			if(c < .5f) {
-				c *= 2.0f;
-				c = pow(c, 1.0f - contrastizeFactor);
-				c *= .5f;
-			}
-			else {
-				c = (c - .5f) * 2.0f;
-				c = pow(c, 1.0f - contrastizeFactor);
-				c *= .5f;
-				c += .5f;
-			}
-			//auto c2 = 3.0f * c * c - 2.0f * c * c * c;
-			//c = mix(c, c2, contrastizeFactor);
-			//c = ci::constrain(c, 0.0f, 1.0f);
+			c = mulContrastize(c, contrastizeFactor);
 		}
 
+	}
+
+	static float mulContrastize(float i, float contrastizeFactor) {
+		const bool invert = i > .5f;
+		if (invert) {
+			i = 1.0f - i;
+		}
+		i *= 2.0f;
+		i = pow(i, contrastizeFactor);
+		i *= .5f;
+		if (invert) {
+			i = 1.0f - i;
+		}
+		return i;
 	}
 	void stefanDraw()
 	{
@@ -347,6 +343,12 @@ struct SApp : App {
 
 		sw::timeit("draw", [&]() {
 			auto tex = gtex(img);
+			/*tex= shade2(tex, "float f = fetch1();"
+				"float fw = fwidth(f);"
+				"f = smoothstep(0.5-fw/2.0, 0.5+fw/2.0, f);"
+				"_out.r = f;",
+				ShadeOpts().dstRectSize(getWindowSize())
+			);*/
 			gl::draw(redToLuminance(tex), getWindowBounds());
 		});
 	}
@@ -356,7 +358,5 @@ CrossThreadCallQueue* gMainThreadCallQueue;
 CINDER_APP(SApp, RendererGl(),
 	[&](ci::app::App::Settings* settings)
 	{
-		//bool developer = (bool)ifstream(getAssetPath("developer"));
 		settings->setConsoleWindowEnabled(true);
-		settings->setTitle("Volcano stuffs");
 	})
