@@ -186,7 +186,7 @@ struct SApp : App {
 				float valRight = getBilinear<float, WrapModes::GetClamped>(guidance, p - gradP);
 				float add = (val - (valLeft + valRight) * .5f);
 				//aaPoint<float, WrapModes::GetWrapped>(img2, p - grad * abc, add * abc);
-				aaPoint<float, WrapModes::GetWrapped>(img2, p - grad * abc, add * abc);
+				aaPoint<float, WrapModes::GetWrapped>(img2, p - grad * add, add * abc);
 				//img2(p) = add * abc;
 			}
 		}
@@ -226,7 +226,7 @@ struct SApp : App {
 			"_out.r = mix(f, fb, .8f);"
 		);
 		img = gettexdata<float>(tex, GL_RED, GL_FLOAT);
-		img = ::to01(img);
+		//img = ::to01(img);
 
 		float sum = ::accumulate(img.begin(), img.end(), 0.0f);
 		float avg = sum / (float)img.area;
@@ -234,15 +234,17 @@ struct SApp : App {
 		{
 			img(p) += .5f - avg;
 		}
-		forxy(img) {
-			float floatY = p.y / (float)img.h;
-			floatY = glm::mix(blendWeaken, 1.0f - blendWeaken, floatY);
-			floatY = std::max(0.0f, std::min(1.0f, floatY));
-			if (floatY < .5) {
-				img(p) *= floatY * 2;
-			}
-			else {
-				img(p) = glm::mix(img(p), 1.0f, (floatY - 0.5f) * 2);
+		if (blendWeaken != 0.5f) {
+			forxy(img) {
+				float floatY = p.y / (float)img.h;
+				floatY = glm::mix(blendWeaken, 1.0f - blendWeaken, floatY);
+				floatY = std::max(0.0f, std::min(1.0f, floatY));
+				if (floatY < .5) {
+					img(p) *= floatY * 2;
+				}
+				else {
+					img(p) = glm::mix(img(p), 1.0f, (floatY - 0.5f) * 2);
+				}
 			}
 		}
 		return img;
@@ -311,10 +313,10 @@ struct SApp : App {
 	
 	void stefanUpdate() {
 		abc = cfg2::getFloat("morphogenesis", .02, 0.068, 20, 2.418, ImGuiSliderFlags_Logarithmic);
-		contrastizeFactor = cfg2::getFloat("contrastizeFactor", 1.f, 0.0, 10, 0.0f, ImGuiSliderFlags_None);
-		blendWeaken = cfg2::getFloat("blendWeaken", 0.01f, 0.1, .499, .499f);
-		weightFactor = cfg2::getFloat("weightFactor", 0.1f, 0.1, 30, 30, ImGuiSliderFlags_Logarithmic);
-		float multiscale = cfg2::getBool("multiscale", false);
+		contrastizeFactor = cfg2::getFloat("contrastizeFactor", 0.1f, 0.0, 10, 0.8f);
+		blendWeaken = cfg2::getFloat("blendWeaken", 0.01f, 0.1, .5f, .48f);
+		weightFactor = cfg2::getFloat("weightFactor", 0.1f, 0.1, 60.0f, 30, ImGuiSliderFlags_Logarithmic);
+		float multiscale = cfg2::getBool("multiscale", true);
 
 		if (pause2) {
 			return;
@@ -338,7 +340,6 @@ struct SApp : App {
 		gl::setMatricesWindow(vec2(wsx, wsy), false);
 		gl::clear(ColorA::black(), true);
 		gl::disableDepthRead();
-
 
 		sw::timeit("draw", [&]() {
 			auto tex = gtex(img);
