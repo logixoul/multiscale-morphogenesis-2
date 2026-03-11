@@ -118,8 +118,7 @@ struct SApp : App {
 				float valLeft = getBilinear<float, WrapModes::GetClamped>(img, p + gradP);
 				float valRight = getBilinear<float, WrapModes::GetClamped>(img, p - gradP);
 				float add = (val - (valLeft + valRight) * .5f);
-				float addAbs = abs(add);
-				aaPoint<float, WrapModes::GetClamped>(img2, p - grad * addAbs, add * abc);
+				aaPoint<float, WrapModes::GetClamped>(img2, p - grad * add, add * abc);
 			}
 		}
 		img = gauss3Better<float, WrapModes::GetClamped>(img2);
@@ -212,7 +211,7 @@ struct SApp : App {
 			img = updateSingleScale(img);
 
 		img = to01(img);
-		if(0)forxy(img) {
+		forxy(img) {
 			auto& c = img(p);
 			c = ci::constrain(c, 0.0f, 1.0f);
 			c = mulContrastize(c, contrastizeFactor);
