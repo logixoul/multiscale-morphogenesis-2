@@ -60,6 +60,7 @@
     <ClCompile Include="cfg2.cpp" />
     <ClCompile Include="CinderImGui.cpp" />
     <ClCompile Include="IntegratedConsole.cpp" />
+    <ClCompile Include="main2_cleaner.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="precompiled.h" />
