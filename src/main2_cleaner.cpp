@@ -351,7 +351,7 @@ struct SApp : App {
 			return;
 		}
 		if(multiscale)
-			img = multiscaleApply(img, [this](auto arg) { return update_1_scale(arg); });
+			img = multiscaleApply(img, [this](auto arg) { return update_1_scale_v2_cleanedUp(arg); });
 		else
 			img = update_1_scale_v2_cleanedUp(img);
 
