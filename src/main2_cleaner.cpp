@@ -186,16 +186,17 @@ struct SApp : App {
 		auto gradients = ::get_gradients<float, WrapModes::GetClamped>(blurredImg);
 		auto img2 = img.clone();
 		forxy(img) {
-			vec2 pf = vec2(p);
-			vec2 grad = safeNormalized(gradients(p));
+			vec2 const& pf = vec2(p);
+			vec2 const& grad = gradients(p);
+			vec2 const& gradN = safeNormalized(gradients(p));
 
-			vec2 gradP = perpLeft(grad);
+			vec2 const& gradNPerp = perpLeft(gradN);
 
 			float val = img(p);
-			float valLeft = getBilinear<float, WrapModes::GetClamped>(blurredImg, pf + gradP);
-			float valRight = getBilinear<float, WrapModes::GetClamped>(blurredImg, pf - gradP);
+			float valLeft = getBilinear<float, WrapModes::GetClamped>(blurredImg, pf + gradNPerp);
+			float valRight = getBilinear<float, WrapModes::GetClamped>(blurredImg, pf - gradNPerp);
 			float add = (val - (valLeft + valRight) * .5f);
-			aaPoint<float, WrapModes::GetClamped>(img2, pf - grad * add, add * options.morphogenesisStrength);
+			aaPoint<float, WrapModes::GetClamped>(img2, pf - gradN * add, add * options.morphogenesisStrength);
 		}
 		img = gaussianBlur3x3<float, WrapModes::GetClamped>(img2);
 		img = applyVerticalGradient(img);
