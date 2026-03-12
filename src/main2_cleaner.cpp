@@ -197,13 +197,18 @@ struct SApp : App {
 			aaPoint<float, WrapModes::GetClamped>(img2, pf - grad * add, add * options.morphogenesisStrength);
 		}
 		img = gaussianBlur3x3<float, WrapModes::GetClamped>(img2);
-		
-		forxy(img) {
-			float floatY = p.y / (float)img.h;
-			floatY = glm::mix(options.blendWeaken, 1.0f - options.blendWeaken, floatY);
-			img(p) = blendHardLight(img(p), floatY);
-		}
+		img = applyVerticalGradient(img);
+
 		return img;
+	}
+	Img applyVerticalGradient(Img const& img) {
+		Img result = ::zeros_like(img);
+		forxy(result) {
+			float floatY = p.y / (float)result.h;
+			floatY = glm::mix(options.blendWeaken, 1.0f - options.blendWeaken, floatY);
+			result(p) = blendHardLight(img(p), floatY);
+		}
+		return result;
 	}
 	float getLevelWeight(int level, int maxLevel) const {
 		float iNormalized = level / float(maxLevel - 1);
