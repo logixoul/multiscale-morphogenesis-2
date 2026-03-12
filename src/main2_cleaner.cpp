@@ -204,14 +204,18 @@ struct SApp : App {
 		float blendWeaken;
 		float weightFactor;
 		bool multiscale;
+		bool binarizePostprocessing;
+		float highPassStrength;
 
 		static Options get() {
 			return Options{
-				cfg2::getFloat("morphogenesis", .02, 0.068, 20, 1.35, ImGuiSliderFlags_Logarithmic),
+				cfg2::getFloat("morphogenesis", .02, 0.068, 20, 0.658, ImGuiSliderFlags_Logarithmic),
 				cfg2::getFloat("contrastizeFactor", 0.01f, 1.0, 10, 1.0f),
-				cfg2::getFloat("blendWeaken", 0.01f, 0.1, .5f, .49f),
+				cfg2::getFloat("blendWeaken", 0.01f, 0.1, .5f, .490f),
 				cfg2::getFloat("weightFactor", 0.1f, 0.01f, 60.0f, 0.1f, ImGuiSliderFlags_Logarithmic),
-				cfg2::getBool("multiscale", true)
+				cfg2::getBool("multiscale", true),
+				cfg2::getBool("binarizePostprocessing", true),
+				cfg2::getFloat("highPassStrength", 0.01f, 0.0f, 1.0f, 0.90f)
 			};
 		}
 	};
@@ -257,31 +261,43 @@ struct SApp : App {
 			img(p) = ::randFloat();
 		}
 	}
-
+	template<class T, class FetchFunc>
+	static float hessianDirectionalSecondDeriv(Array2D<T>& src, ivec2 const& p, vec2 const& d) {
+		float fxx = FetchFunc::fetch(src, p.x + 1, p.y) - 2.0f * FetchFunc::fetch(src, p.x, p.y) + FetchFunc::fetch(src, p.x - 1, p.y);
+		float fyy = FetchFunc::fetch(src, p.x, p.y + 1) - 2.0f * FetchFunc::fetch(src, p.x, p.y) + FetchFunc::fetch(src, p.x, p.y - 1);
+		float fxy = 0.25f * (
+			FetchFunc::fetch(src, p.x + 1, p.y + 1)
+			- FetchFunc::fetch(src, p.x - 1, p.y + 1)
+			- FetchFunc::fetch(src, p.x + 1, p.y - 1)
+			+ FetchFunc::fetch(src, p.x - 1, p.y - 1));
+		return d.x * d.x * fxx + 2.0f * d.x * d.y * fxy + d.y * d.y * fyy;
+	}
 	Array2D<float> updateSingleScale(Array2D<float> aImg)
 	{
 		auto img = aImg.clone();
 
 		//auto blurredImg = gaussianBlur3x3<float, WrapModes::GetClamped>(img);
-		auto kernel = getGaussianKernel(5, sigmaFromKsize(5)/2);
+		auto kernel = getGaussianKernel(3, sigmaFromKsize(3));
 		//auto blurredImg = ::separableConvolve<float, WrapModes::GetClamped>(img, kernel);
-		auto gradients = ::get_gradients<float, WrapModes::GetClamped>(img);
+		auto gradients = ::get_gradients_sobel<float, WrapModes::GetClamped>(img);
 		auto img2 = img.clone();
 		forxy(img) {
 			vec2 const& pf = vec2(p);
 			vec2 const& grad = gradients(p);
-			vec2 const& gradN = safeNormalized(gradients(p));
+			vec2 const& gradN = safeNormalized(grad);
 
 			vec2 const& gradNPerp = perpLeft(gradN);
 
-			float val = img(p);
-			float valLeft = getBicubic<float, WrapModes::GetClamped>(img, pf + gradNPerp);
-			float valRight = getBicubic<float, WrapModes::GetClamped>(img, pf - gradNPerp);
-			float add = (val - (valLeft + valRight) * .5f);
+			//float val = img(p);
+			//float valLeft = getBicubic<float, WrapModes::GetClamped>(img, pf + gradNPerp);
+			//float valRight = getBicubic<float, WrapModes::GetClamped>(img, pf - gradNPerp);
+			//float add = (val - (valLeft + valRight) * .5f);
+			float add = -hessianDirectionalSecondDeriv<float, WrapModes::GetClamped>(img, p, gradNPerp);
 			aaPoint<float, WrapModes::GetClamped>(img2, pf - gradN * add, add * options.morphogenesisStrength);
 		}
 		//img = multiply(add(img2, blurredImg2), .5);
-		auto blurredImg2 = ::separableConvolve<float, WrapModes::GetClamped>(img2, kernel);
+		//auto blurredImg2 = ::separableConvolve<float, WrapModes::GetClamped>(img2, kernel);
+		auto blurredImg2 = ::gaussianBlur3x3<float, WrapModes::GetClamped>(img2);
 		img = blurredImg2;
 		img = applyVerticalGradient(img);
 
@@ -374,13 +390,45 @@ struct SApp : App {
 		gl::disableDepthRead();
 
 		sw::timeit("draw", [&]() {
-			auto tex = gtex(img);
-			/*tex= shade2(tex, "float f = fetch1();"
-				"float fw = fwidth(f);"
-				"f = smoothstep(0.5-fw/2.0, 0.5+fw/2.0, f);"
-				"_out.r = f;",
-				ShadeOpts().dstRectSize(getWindowSize())
-			);*/
+			gl::TextureRef tex = gtex(img);
+			if (options.binarizePostprocessing) {
+				auto img2 = img.clone();
+				forxy(img2) img2(p) -= .5f;
+				auto accum = zeros_like(img);
+				float sumw = 0.0f;
+				for (int kernelRadius = 3; kernelRadius <= 15; kernelRadius *= 2) {
+					auto imgb = gaussianBlur<float, WrapModes::GetClamped>(img2, kernelRadius*2+1);
+					accum = add(accum, imgb);
+					sumw++;
+				}
+				accum = multiply(accum, 1.0f / sumw);
+				auto texb = gtex(accum);
+				tex = gtex(img2);
+				tex = shade2(tex, texb,
+					"float f = fetch1();"
+					"float fBlurred = fetch1(tex2);"
+					"float highPassed = f - fBlurred*highPassStrength;"
+					//"
+					"float fw = fwidth(highPassed);"
+					//"fw = clamp(fw, 0.2, 0.3);"
+					"highPassed = smoothstep(-fw/2.0, fw/2.0, highPassed);"
+					//"f = smoothstep(-0.2, 0.2, f);"
+					"_out.r = mix(f + .5, highPassed, .5);",
+					ShadeOpts().dstRectSize(getWindowSize()).uniform("highPassStrength", options.highPassStrength),
+					MULTILINE(
+						float blendHardLight(float base, float blend) {
+							if (blend < 0.5f) {
+								// Multiply: darkens the image based on the blend layer
+								return 2.0f * base * blend;
+							}
+							else {
+								// Screen: lightens the image based on the blend layer
+								return 1.0f - 2.0f * (1.0f - base) * (1.0f - blend);
+							}
+						}
+					)
+				);
+			}
 			gl::draw(redToLuminance(tex), getWindowBounds());
 		});
 	}
