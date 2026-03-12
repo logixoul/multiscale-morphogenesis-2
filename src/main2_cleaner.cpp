@@ -383,6 +383,30 @@ struct SApp : App {
 		}
 		return i;
 	}
+	gl::TextureRef postprocess() {
+		auto img2 = img.clone();
+		forxy(img2) img2(p) -= .5f;
+		auto accum = zeros_like(img);
+		float sumw = 0.0f;
+		for (int kernelRadius = 3; kernelRadius <= 15; kernelRadius *= 2) {
+			auto imgb = gaussianBlur<float, WrapModes::GetClamped>(img2, kernelRadius * 2 + 1);
+			accum = add(accum, imgb);
+			sumw++;
+		}
+		accum = multiply(accum, 1.0f / sumw);
+		auto texb = gtex(accum);
+		auto tex = gtex(img2);
+		tex = shade2(tex, texb,
+			"float f = fetch1();"
+			"float fBlurred = fetch1(tex2);"
+			"float highPassed = f - fBlurred*highPassStrength;"
+			"float fw = fwidth(highPassed);"
+			"highPassed = smoothstep(-fw/2.0, fw/2.0, highPassed);"
+			"_out.r = mix(f + .5, highPassed, .5);",
+			ShadeOpts().dstRectSize(getWindowSize()).uniform("highPassStrength", options.highPassStrength)
+		);
+		return tex;
+	}
 	void stefanDraw()
 	{
 		gl::setMatricesWindow(vec2(wsx, wsy), false);
@@ -392,42 +416,7 @@ struct SApp : App {
 		sw::timeit("draw", [&]() {
 			gl::TextureRef tex = gtex(img);
 			if (options.binarizePostprocessing) {
-				auto img2 = img.clone();
-				forxy(img2) img2(p) -= .5f;
-				auto accum = zeros_like(img);
-				float sumw = 0.0f;
-				for (int kernelRadius = 3; kernelRadius <= 15; kernelRadius *= 2) {
-					auto imgb = gaussianBlur<float, WrapModes::GetClamped>(img2, kernelRadius*2+1);
-					accum = add(accum, imgb);
-					sumw++;
-				}
-				accum = multiply(accum, 1.0f / sumw);
-				auto texb = gtex(accum);
-				tex = gtex(img2);
-				tex = shade2(tex, texb,
-					"float f = fetch1();"
-					"float fBlurred = fetch1(tex2);"
-					"float highPassed = f - fBlurred*highPassStrength;"
-					//"
-					"float fw = fwidth(highPassed);"
-					//"fw = clamp(fw, 0.2, 0.3);"
-					"highPassed = smoothstep(-fw/2.0, fw/2.0, highPassed);"
-					//"f = smoothstep(-0.2, 0.2, f);"
-					"_out.r = mix(f + .5, highPassed, .5);",
-					ShadeOpts().dstRectSize(getWindowSize()).uniform("highPassStrength", options.highPassStrength),
-					MULTILINE(
-						float blendHardLight(float base, float blend) {
-							if (blend < 0.5f) {
-								// Multiply: darkens the image based on the blend layer
-								return 2.0f * base * blend;
-							}
-							else {
-								// Screen: lightens the image based on the blend layer
-								return 1.0f - 2.0f * (1.0f - base) * (1.0f - blend);
-							}
-						}
-					)
-				);
+				tex = postprocess();
 			}
 			gl::draw(redToLuminance(tex), getWindowBounds());
 		});
