@@ -107,7 +107,37 @@ Array2D<vec2> get_gradients_sobel(Array2D<T> src)
 	return get_gradients_sobel<T, WrapModes::DefaultImpl>(src);
 }
 
+// implemented by AI
+template<class T, class FetchFunc>
+static T getBicubic(Array2D<T>& src, vec2 p) {
+	vec2 f = glm::floor(p);
+	vec2 t = p - f;
+	int ix = (int)f.x;
+	int iy = (int)f.y;
 
+	auto w = [](float t) -> vec4 {
+		// Catmull-Rom weights
+		float t2 = t * t;
+		float t3 = t2 * t;
+		return vec4(
+			-0.5f * t3 + t2 - 0.5f * t,
+			1.5f * t3 - 2.5f * t2 + 1.0f,
+			-1.5f * t3 + 2.0f * t2 + 0.5f * t,
+			0.5f * t3 - 0.5f * t2
+		);
+		};
+
+	vec4 wx = w(t.x);
+	vec4 wy = w(t.y);
+
+	T result = T(0);
+	for (int j = 0; j < 4; j++) {
+		for (int i = 0; i < 4; i++) {
+			result += wx[i] * wy[j] * FetchFunc::fetch(src, ix - 1 + i, iy - 1 + j);
+		}
+	}
+	return result;
+}
 
 #if 0
 static Array2D<vec3> resize(Array2D<vec3> src, ivec2 dstSize, const ci::FilterBase& filter)
@@ -234,8 +264,8 @@ struct SApp : App {
 
 		//auto blurredImg = gaussianBlur3x3<float, WrapModes::GetClamped>(img);
 		auto kernel = getGaussianKernel(5, sigmaFromKsize(5)/2);
-		auto blurredImg = ::separableConvolve<float, WrapModes::GetClamped>(img, kernel);
-		auto gradients = ::get_gradients_sobel<float, WrapModes::GetClamped>(blurredImg);
+		//auto blurredImg = ::separableConvolve<float, WrapModes::GetClamped>(img, kernel);
+		auto gradients = ::get_gradients<float, WrapModes::GetClamped>(img);
 		auto img2 = img.clone();
 		forxy(img) {
 			vec2 const& pf = vec2(p);
@@ -245,8 +275,8 @@ struct SApp : App {
 			vec2 const& gradNPerp = perpLeft(gradN);
 
 			float val = img(p);
-			float valLeft = getBilinear<float, WrapModes::GetClamped>(blurredImg, pf + gradNPerp);
-			float valRight = getBilinear<float, WrapModes::GetClamped>(blurredImg, pf - gradNPerp);
+			float valLeft = getBicubic<float, WrapModes::GetClamped>(img, pf + gradNPerp);
+			float valRight = getBicubic<float, WrapModes::GetClamped>(img, pf - gradNPerp);
 			float add = (val - (valLeft + valRight) * .5f);
 			aaPoint<float, WrapModes::GetClamped>(img2, pf - gradN * add, add * options.morphogenesisStrength);
 		}
@@ -300,7 +330,7 @@ struct SApp : App {
 			nextScale = ::add(origScales[i - 1], upscaledDiff);
 			nextScale = func(nextScale);
 			forxy(nextScale) {
-				nextScale(p) = mulContrastize(nextScale(p), options.contrastizeStrength);
+				//nextScale(p) = mulContrastize(nextScale(p), options.contrastizeStrength);
 			}
 		}
 		return updatedScales[0];
