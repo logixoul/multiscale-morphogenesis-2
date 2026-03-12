@@ -217,7 +217,7 @@ struct SApp : App {
 				cfg2::getFloat("weightFactor", 0.1f, 0.01f, 60.0f, 0.1f, ImGuiSliderFlags_Logarithmic),
 				cfg2::getBool("multiscale", true),
 				cfg2::getBool("binarizePostprocessing", true),
-				cfg2::getFloat("highPassStrength", 0.01f, 0.0f, 1.0f, 0.90f)
+				cfg2::getFloat("highPassStrength", 0.01f, 0.0f, 1.0f, 1.0f)
 			};
 		}
 	};
@@ -385,37 +385,9 @@ struct SApp : App {
 		}
 		return i;
 	}
-	gl::TextureRef postprocess() {
-		auto img2 = img.clone();
-		forxy(img2) img2(p) -= .5f;
-		auto accum = zeros_like(img);
-		float sumw = 0.0f;
-		for (int kernelRadius = 3; kernelRadius <= 15; kernelRadius *= 2) {
-			auto imgb = gaussianBlur<float, WrapModes::GetClamped>(img2, kernelRadius * 2 + 1);
-			accum = add(accum, imgb);
-			sumw++;
-		}
-		accum = multiply(accum, 1.0f / sumw);
-		auto texb = gtex(accum);
-		auto tex = gtex(img2);
-		tex = shade2(tex, texb,
-			"float f = fetch1();"
-			"float fBlurred = fetch1(tex2);"
-			"float highPassed = f - fBlurred*highPassStrength;"
-			"float fw = fwidth(highPassed);"
-			"highPassed = smoothstep(-fw/2.0, fw/2.0, highPassed);"
-			"_out.r = mix(f + .5, highPassed, .5);",
-			ShadeOpts().dstRectSize(getWindowSize()).uniform("highPassStrength", options.highPassStrength)
-		);
-		return tex;
-	}
 	static gl::TextureRef gpuHighpass(gl::TextureRef in, float strength) {
-		auto inCentered = shade2(in,
-			"float f = fetch1();"
-			"_out.r = f - .5;"
-		);
-		auto blurred = gpuBlurClaude::blurWithInvKernel(inCentered);
-		auto highpassed = shade2(inCentered, blurred, MULTILINE(
+		auto blurred = gpuBlurClaude::blurWithInvKernel(in);
+		auto highpassed = shade2(in, blurred, MULTILINE(
 			float f = fetch1();
 			float fBlurred = fetch1(tex2);
 			float highPassed = f - fBlurred*highPassStrength;
@@ -424,12 +396,18 @@ struct SApp : App {
 		);
 		return highpassed;
 	}
-	gl::TextureRef postprocessV2() {
+	gl::TextureRef postprocess() {
 		auto imgClamped = img.clone();
 		forxy(imgClamped) imgClamped(p) = ci::constrain(imgClamped(p), 0.0f, 1.0f);
 
 		auto imgTex = gtex(imgClamped);
-		auto imgTexHighpassed = gpuHighpass(imgTex, options.highPassStrength);
+		auto imgTexCentered = shade2(imgTex,
+			"float f = fetch1();"
+			"_out.r = f - .5;"
+		);
+
+		auto imgTexHighpassed = gpuHighpass(imgTexCentered, options.highPassStrength);
+		imgTexHighpassed = gpuHighpass(imgTexHighpassed, options.highPassStrength);
 		auto imgHighpassed = dl<float>(imgTexHighpassed);
 
 		auto pyramid = buildGaussianPyramid(imgHighpassed);
@@ -451,6 +429,7 @@ struct SApp : App {
 			_out.rgb = fire;
 		),
 			ShadeOpts().ifmt(GL_RGBA16F));
+		//stateTex = op(stateTex) + gpuBlurClaude::blurWithInvKernel(stateTex);
 		return stateTex;
 	}
 	void stefanDraw()
@@ -462,7 +441,7 @@ struct SApp : App {
 		sw::timeit("draw", [&]() {
 			gl::TextureRef tex = gtex(img);
 			if (options.binarizePostprocessing) {
-				tex = postprocessV2();
+				tex = postprocess();
 			}
 			else {
 				tex = redToLuminance(tex);
