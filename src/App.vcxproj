@@ -162,11 +162,11 @@
     <ClCompile Include="cfg1.cpp" />
     <ClCompile Include="gpuBlurClaude.cpp" />
     <ClCompile Include="IntegratedConsole.cpp" />
-    <ClCompile Include="main2_cleaner.cpp" />
+    <ClCompile Include="main.cpp" />
     <ClCompile Include="MyTimer.cpp" />
     <ClCompile Include="gpuBlur2_5.cpp">
     </ClCompile>
-    <ClCompile Include="main.cpp">
+    <ClCompile Include="main_old_3d.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </ClCompile>
