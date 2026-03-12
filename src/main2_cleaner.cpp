@@ -6,12 +6,12 @@
 #include "Array2D_imageProc.h"
 #include "gpgpu.h"
 #include "cfg2.h"
-#include "sw.h"
 
 #include "stefanfw.h"
 
 #include "CrossThreadCallQueue.h"
 #include "gpuBlurClaude.h"
+#include "gpuBlur2_5.h"
 
 static vec2 perpLeft(vec2 const& v) {
 	return vec2(-v.y, v.x);
@@ -107,37 +107,30 @@ Array2D<vec2> get_gradients_sobel(Array2D<T> src)
 {
 	return get_gradients_sobel<T, WrapModes::DefaultImpl>(src);
 }
-
-// implemented by AI
-template<class T, class FetchFunc>
-static T getBicubic(Array2D<T>& src, vec2 p) {
-	vec2 f = glm::floor(p);
-	vec2 t = p - f;
-	int ix = (int)f.x;
-	int iy = (int)f.y;
-
-	auto w = [](float t) -> vec4 {
-		// Catmull-Rom weights
-		float t2 = t * t;
-		float t3 = t2 * t;
-		return vec4(
-			-0.5f * t3 + t2 - 0.5f * t,
-			1.5f * t3 - 2.5f * t2 + 1.0f,
-			-1.5f * t3 + 2.0f * t2 + 0.5f * t,
-			0.5f * t3 - 0.5f * t2
-		);
-		};
-
-	vec4 wx = w(t.x);
-	vec4 wy = w(t.y);
-
-	T result = T(0);
-	for (int j = 0; j < 4; j++) {
-		for (int i = 0; i < 4; i++) {
-			result += wx[i] * wy[j] * FetchFunc::fetch(src, ix - 1 + i, iy - 1 + j);
-		}
+static float mulContrastize(float i, float contrastizeStrength) {
+	i = ci::constrain(i, 0.0f, 1.0f);
+	const bool invert = i > .5f;
+	if (invert) {
+		i = 1.0f - i;
 	}
-	return result;
+	i *= 2.0f;
+	i = pow(i, contrastizeStrength);
+	i *= .5f;
+	if (invert) {
+		i = 1.0f - i;
+	}
+	return i;
+}
+template<class T, class FetchFunc>
+static float hessianDirectionalSecondDeriv(Array2D<T>& src, ivec2 const& p, vec2 const& d) {
+	float fxx = FetchFunc::fetch(src, p.x + 1, p.y) - 2.0f * FetchFunc::fetch(src, p.x, p.y) + FetchFunc::fetch(src, p.x - 1, p.y);
+	float fyy = FetchFunc::fetch(src, p.x, p.y + 1) - 2.0f * FetchFunc::fetch(src, p.x, p.y) + FetchFunc::fetch(src, p.x, p.y - 1);
+	float fxy = 0.25f * (
+		FetchFunc::fetch(src, p.x + 1, p.y + 1)
+		- FetchFunc::fetch(src, p.x - 1, p.y + 1)
+		- FetchFunc::fetch(src, p.x + 1, p.y - 1)
+		+ FetchFunc::fetch(src, p.x - 1, p.y - 1));
+	return d.x * d.x * fxx + 2.0f * d.x * d.y * fxy + d.y * d.y * fyy;
 }
 
 #if 0
@@ -161,16 +154,17 @@ static Array2D<float> resize(Array2D<float> src, ivec2 dstSize, const ci::Filter
 	return resultArray;
 }
 
-static std::vector<Img> buildGaussianPyramid(Img src) {
+static std::vector<Img> buildGaussianPyramid(Img src, float scalePerLevel = 0.5f) {
 	std::vector<Img> scales;
-	int size = std::min(src.w, src.h);
 	auto state = src.clone();
 	static const auto filter = ci::FilterGaussian();
-	while (size > 2)
+	while (true)
 	{
+		const int size = std::min(state.w, state.h);
+		if (size <= 2)
+			break;
 		scales.push_back(state);
 		state = ::resize(state, state.Size() / 2, filter);
-		size /= 2;
 	}
 	return scales;
 }
@@ -213,7 +207,7 @@ struct SApp : App {
 				cfg2::getFloat("morphogenesis", .02, 0.068, 20, 0.658, ImGuiSliderFlags_Logarithmic),
 				//cfg2::getFloat("contrastizeFactor", 0.01f, 1.0, 10, 1.0f),
 				1.0f,
-				cfg2::getFloat("blendWeaken", 0.01f, 0.1, .5f, .490f),
+				cfg2::getFloat("blendWeaken", 0.001f, 0.1, .5f, .490f),
 				cfg2::getFloat("weightFactor", 0.1f, 0.01f, 60.0f, 0.1f, ImGuiSliderFlags_Logarithmic),
 				cfg2::getBool("multiscale", true),
 				cfg2::getBool("binarizePostprocessing", true),
@@ -263,41 +257,21 @@ struct SApp : App {
 			img(p) = ::randFloat();
 		}
 	}
-	template<class T, class FetchFunc>
-	static float hessianDirectionalSecondDeriv(Array2D<T>& src, ivec2 const& p, vec2 const& d) {
-		float fxx = FetchFunc::fetch(src, p.x + 1, p.y) - 2.0f * FetchFunc::fetch(src, p.x, p.y) + FetchFunc::fetch(src, p.x - 1, p.y);
-		float fyy = FetchFunc::fetch(src, p.x, p.y + 1) - 2.0f * FetchFunc::fetch(src, p.x, p.y) + FetchFunc::fetch(src, p.x, p.y - 1);
-		float fxy = 0.25f * (
-			FetchFunc::fetch(src, p.x + 1, p.y + 1)
-			- FetchFunc::fetch(src, p.x - 1, p.y + 1)
-			- FetchFunc::fetch(src, p.x + 1, p.y - 1)
-			+ FetchFunc::fetch(src, p.x - 1, p.y - 1));
-		return d.x * d.x * fxx + 2.0f * d.x * d.y * fxy + d.y * d.y * fyy;
-	}
 	Array2D<float> updateSingleScale(Array2D<float> aImg)
 	{
 		auto img = aImg.clone();
 
-		//auto blurredImg = gaussianBlur3x3<float, WrapModes::GetClamped>(img);
-		auto kernel = getGaussianKernel(3, sigmaFromKsize(3));
-		//auto blurredImg = ::separableConvolve<float, WrapModes::GetClamped>(img, kernel);
 		auto gradients = ::get_gradients_sobel<float, WrapModes::GetClamped>(img);
 		auto img2 = img.clone();
 		forxy(img) {
 			vec2 const& pf = vec2(p);
 			vec2 const& grad = gradients(p);
 			vec2 const& gradN = safeNormalized(grad);
-
 			vec2 const& gradNPerp = perpLeft(gradN);
-
-			//float val = img(p);
-			//float valLeft = getBicubic<float, WrapModes::GetClamped>(img, pf + gradNPerp);
-			//float valRight = getBicubic<float, WrapModes::GetClamped>(img, pf - gradNPerp);
-			//float add = (val - (valLeft + valRight) * .5f);
 			float add = -hessianDirectionalSecondDeriv<float, WrapModes::GetClamped>(img, p, gradNPerp);
 			aaPoint<float, WrapModes::GetClamped>(img2, pf - gradN * add, add * options.morphogenesisStrength);
 		}
-		//img = multiply(add(img2, blurredImg2), .5);
+		auto kernel = getGaussianKernel(3, sigmaFromKsize(3));
 		//auto blurredImg2 = ::separableConvolve<float, WrapModes::GetClamped>(img2, kernel);
 		auto blurredImg2 = ::gaussianBlur3x3<float, WrapModes::GetClamped>(img2);
 		img = blurredImg2;
@@ -333,10 +307,6 @@ struct SApp : App {
 		std::vector<Img> origScales = ::buildGaussianPyramid(src);
 		std::vector<Img> updatedScales(origScales.size());
 		static const auto filter = ci::FilterGaussian();
-		/*for (auto s : origScales)
-		{
-			updatedScales.push_back(func(s));
-		}*/
 		const int last = origScales.size() - 1;
 		updatedScales[last] = func(origScales[last]);
 		auto weights = getLevelWeights(origScales.size());
@@ -347,9 +317,6 @@ struct SApp : App {
 			auto& nextScale = updatedScales[i - 1];
 			nextScale = ::add(origScales[i - 1], upscaledDiff);
 			nextScale = func(nextScale);
-			forxy(nextScale) {
-				//nextScale(p) = mulContrastize(nextScale(p), options.contrastizeStrength);
-			}
 		}
 		return updatedScales[0];
 	}
@@ -364,27 +331,8 @@ struct SApp : App {
 			img = multiscaleApply(img, [this](auto arg) { return updateSingleScale(arg); });
 		else
 			img = updateSingleScale(img);
-
-		//img = to01(img);
-		forxy(img) {
-			//img(p) = mulContrastize(img(p), options.contrastizeStrength);
-		}
 	}
 
-	static float mulContrastize(float i, float contrastizeStrength) {
-		i = ci::constrain(i, 0.0f, 1.0f);
-		const bool invert = i > .5f;
-		if (invert) {
-			i = 1.0f - i;
-		}
-		i *= 2.0f;
-		i = pow(i, contrastizeStrength);
-		i *= .5f;
-		if (invert) {
-			i = 1.0f - i;
-		}
-		return i;
-	}
 	static gl::TextureRef gpuHighpass(gl::TextureRef in, float strength) {
 		auto blurred = gpuBlurClaude::blurWithInvKernel(in);
 		auto highpassed = shade2(in, blurred, MULTILINE(
@@ -423,13 +371,13 @@ struct SApp : App {
 			stateTex = op(stateTex) + thisLevelTexContrastized;
 		}
 		stateTex = op(stateTex) / float(pyramid.size());
+		//stateTex = (op(stateTex) + op(gpuBlur2_5::run(stateTex, 3))*2.0f) / 2;
 		stateTex = shade2(stateTex, MULTILINE(
 			float val = fetch1();
 			vec3 fire = vec3(min(val * 1.5, 1.), pow(val, 2.5), pow(val, 12.));
 			_out.rgb = fire;
 		),
 			ShadeOpts().ifmt(GL_RGBA16F));
-		//stateTex = op(stateTex) + gpuBlurClaude::blurWithInvKernel(stateTex);
 		return stateTex;
 	}
 	void stefanDraw()
@@ -438,16 +386,14 @@ struct SApp : App {
 		gl::clear(ColorA::black(), true);
 		gl::disableDepthRead();
 
-		sw::timeit("draw", [&]() {
-			gl::TextureRef tex = gtex(img);
-			if (options.binarizePostprocessing) {
-				tex = postprocess();
-			}
-			else {
-				tex = redToLuminance(tex);
-			}
-			gl::draw(tex, getWindowBounds());
-		});
+		gl::TextureRef tex = gtex(img);
+		if (options.binarizePostprocessing) {
+			tex = postprocess();
+		}
+		else {
+			tex = redToLuminance(tex);
+		}
+		gl::draw(tex, getWindowBounds());
 	}
 };
 CrossThreadCallQueue* gMainThreadCallQueue;
