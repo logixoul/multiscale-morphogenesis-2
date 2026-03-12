@@ -182,6 +182,7 @@
     <ClCompile Include="stuff.cpp" />
     <ClCompile Include="sw.cpp" />
     <ClCompile Include="TextureCache.cpp" />
+    <ClCompile Include="ThisSketch_ImageProcessingHelpers.cpp" />
     <ClCompile Include="util.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -206,6 +207,7 @@
     <ClInclude Include="stuff.h" />
     <ClInclude Include="sw.h" />
     <ClInclude Include="TextureCache.h" />
+    <ClInclude Include="ThisSketch_ImageProcessingHelpers.h" />
     <ClInclude Include="util.h" />
   </ItemGroup>
   <ItemGroup>
