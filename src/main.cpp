@@ -12,14 +12,10 @@
 
 #include "CrossThreadCallQueue.h"
 #include "gpuBlurClaude.h"
-#include "gpuBlur2_5.h"
 
 
 int wsx = 700, wsy = 700;
-int sx = 256;
-int sy = 256;
-Array2D<float> img(sx, sy);
-bool pause2 = false;
+Array2D<float> img(256, 256);
 
 struct SApp : App {
 	struct Options {
@@ -68,10 +64,6 @@ struct SApp : App {
 	}
 	void keyDown(KeyEvent e)
 	{
-		if (keys['p'] || keys['2'])
-		{
-			pause2 = !pause2;
-		}
 		if (keys['r'])
 		{
 			reset();
@@ -90,7 +82,7 @@ struct SApp : App {
 	{
 		auto img = aImg.clone();
 
-		auto gradients = ::get_gradients_sobel<float, WrapModes::GetClamped>(img);
+		auto gradients = ::get_gradients<float, WrapModes::GetClamped>(img);
 		auto img2 = img.clone();
 		forxy(img) {
 			vec2 const& pf = vec2(p);
@@ -153,13 +145,10 @@ struct SApp : App {
 	void stefanUpdate() {
 		this->options = Options::get();
 
-		if (pause2) {
-			return;
-		}
 		if(options.multiscale)
 			img = multiscaleApply(img, [this](auto arg) { return updateSingleScale(arg); });
 		else
-		 img = updateSingleScale(img);
+			img = updateSingleScale(img);
 	}
 
 	static gl::TextureRef gpuHighpass(gl::TextureRef in, float strength) {

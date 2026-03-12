@@ -25,62 +25,6 @@ Array2D<T> gaussianBlur3x3(Array2D<T> src) {
 	return dst2;
 }
 
-template<class T, class FetchFunc>
-vec2 gradient_i_nodiv_sobel(Array2D<T>& src, ivec2 const& p)
-{
-	float gx =
-		1.0f * FetchFunc::fetch(src, p.x + 1, p.y - 1)
-		+ 2.0f * FetchFunc::fetch(src, p.x + 1, p.y)
-		+ 1.0f * FetchFunc::fetch(src, p.x + 1, p.y + 1)
-		- 1.0f * FetchFunc::fetch(src, p.x - 1, p.y - 1)
-		- 2.0f * FetchFunc::fetch(src, p.x - 1, p.y)
-		- 1.0f * FetchFunc::fetch(src, p.x - 1, p.y + 1);
-
-	float gy =
-		1.0f * FetchFunc::fetch(src, p.x - 1, p.y + 1)
-		+ 2.0f * FetchFunc::fetch(src, p.x, p.y + 1)
-		+ 1.0f * FetchFunc::fetch(src, p.x + 1, p.y + 1)
-		- 1.0f * FetchFunc::fetch(src, p.x - 1, p.y - 1)
-		- 2.0f * FetchFunc::fetch(src, p.x, p.y - 1)
-		- 1.0f * FetchFunc::fetch(src, p.x + 1, p.y - 1);
-
-	return vec2(gx, gy);
-}
-
-template<class T, class FetchFunc>
-Array2D<vec2> get_gradients_sobel(Array2D<T>& src)
-{
-	auto src2 = src.clone();
-	forxy(src2)
-		src2(p) /= 2.0f;
-
-	Array2D<vec2> gradients(src.w, src.h);
-
-	for (int x = 0; x < src.w; x++)
-	{
-		gradients(x, 0) = gradient_i_nodiv_sobel<T, FetchFunc>(src2, ivec2(x, 0));
-		gradients(x, src.h - 1) = gradient_i_nodiv_sobel<T, FetchFunc>(src2, ivec2(x, src.h - 1));
-	}
-	for (int y = 1; y < src.h - 1; y++)
-	{
-		gradients(0, y) = gradient_i_nodiv_sobel<T, FetchFunc>(src2, ivec2(0, y));
-		gradients(src.w - 1, y) = gradient_i_nodiv_sobel<T, FetchFunc>(src2, ivec2(src.w - 1, y));
-	}
-	for (int y = 1; y < src.h - 1; y++) {
-		for (int x = 1; x < src.w - 1; x++) {
-			gradients(x, y) = gradient_i_nodiv_sobel<T, WrapModes::NoWrap>(src2, ivec2(x, y));
-		}
-	}
-
-	return gradients;
-}
-
-template<class T>
-Array2D<vec2> get_gradients_sobel(Array2D<T> src)
-{
-	return get_gradients_sobel<T, WrapModes::DefaultImpl>(src);
-}
-
 float mulContrastize(float i, float contrastizeStrength);
 
 template<class T, class FetchFunc>
