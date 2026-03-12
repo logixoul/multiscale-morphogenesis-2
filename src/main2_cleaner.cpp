@@ -56,6 +56,56 @@ static Array2D<T> gaussianBlur3x3(Array2D<T> src) {
 		dst2(p) = .25f * (2 * FetchFunc::fetch(dst1, p.x, p.y) + FetchFunc::fetch(dst1, p.x, p.y - 1) + FetchFunc::fetch(dst1, p.x, p.y + 1));
 	return dst2;
 }
+template<class T, class FetchFunc>
+vec2 gradient_i_nodiv_sobel(Array2D<T>& src, ivec2 const& p)
+{
+	// Sobel uses a [1,2,1] weighting perpendicular to the derivative direction,
+	// giving better angular resolution than simple finite differences.
+	float gx =
+		1.0f * FetchFunc::fetch(src, p.x + 1, p.y - 1)
+		+ 2.0f * FetchFunc::fetch(src, p.x + 1, p.y)
+		+ 1.0f * FetchFunc::fetch(src, p.x + 1, p.y + 1)
+		- 1.0f * FetchFunc::fetch(src, p.x - 1, p.y - 1)
+		- 2.0f * FetchFunc::fetch(src, p.x - 1, p.y)
+		- 1.0f * FetchFunc::fetch(src, p.x - 1, p.y + 1);
+	float gy =
+		1.0f * FetchFunc::fetch(src, p.x - 1, p.y + 1)
+		+ 2.0f * FetchFunc::fetch(src, p.x, p.y + 1)
+		+ 1.0f * FetchFunc::fetch(src, p.x + 1, p.y + 1)
+		- 1.0f * FetchFunc::fetch(src, p.x - 1, p.y - 1)
+		- 2.0f * FetchFunc::fetch(src, p.x, p.y - 1)
+		- 1.0f * FetchFunc::fetch(src, p.x + 1, p.y - 1);
+	return vec2(gx, gy);
+}
+template<class T, class FetchFunc>
+Array2D<vec2> get_gradients_sobel(Array2D<T>& src)
+{
+	auto src2 = src.clone();
+	forxy(src2)
+		src2(p) /= 2.0f;
+	Array2D<vec2> gradients(src.w, src.h);
+	for (int x = 0; x < src.w; x++)
+	{
+		gradients(x, 0) = gradient_i_nodiv_sobel<T, FetchFunc>(src2, ivec2(x, 0));
+		gradients(x, src.h - 1) = gradient_i_nodiv_sobel<T, FetchFunc>(src2, ivec2(x, src.h - 1));
+	}
+	for (int y = 1; y < src.h - 1; y++)
+	{
+		gradients(0, y) = gradient_i_nodiv_sobel<T, FetchFunc>(src2, ivec2(0, y));
+		gradients(src.w - 1, y) = gradient_i_nodiv_sobel<T, FetchFunc>(src2, ivec2(src.w - 1, y));
+	}
+	for (int y = 1; y < src.h - 1; y++) {
+		for (int x = 1; x < src.w - 1; x++) {
+			gradients(x, y) = gradient_i_nodiv_sobel<T, WrapModes::NoWrap>(src2, ivec2(x, y));
+		}
+	}
+	return gradients;
+}
+template<class T>
+Array2D<vec2> get_gradients_sobel(Array2D<T> src)
+{
+	return get_gradients_sobel<T, WrapModes::DefaultImpl>(src);
+}
 
 
 
@@ -182,8 +232,10 @@ struct SApp : App {
 	{
 		auto img = aImg.clone();
 
-		auto blurredImg = gaussianBlur3x3<float, WrapModes::GetClamped>(img);
-		auto gradients = ::get_gradients<float, WrapModes::GetClamped>(blurredImg);
+		//auto blurredImg = gaussianBlur3x3<float, WrapModes::GetClamped>(img);
+		auto kernel = getGaussianKernel(5, sigmaFromKsize(5)/2);
+		auto blurredImg = ::separableConvolve<float, WrapModes::GetClamped>(img, kernel);
+		auto gradients = ::get_gradients_sobel<float, WrapModes::GetClamped>(blurredImg);
 		auto img2 = img.clone();
 		forxy(img) {
 			vec2 const& pf = vec2(p);
@@ -198,7 +250,9 @@ struct SApp : App {
 			float add = (val - (valLeft + valRight) * .5f);
 			aaPoint<float, WrapModes::GetClamped>(img2, pf - gradN * add, add * options.morphogenesisStrength);
 		}
-		img = gaussianBlur3x3<float, WrapModes::GetClamped>(img2);
+		//img = multiply(add(img2, blurredImg2), .5);
+		auto blurredImg2 = ::separableConvolve<float, WrapModes::GetClamped>(img2, kernel);
+		img = blurredImg2;
 		img = applyVerticalGradient(img);
 
 		return img;
@@ -229,18 +283,25 @@ struct SApp : App {
 	}
 	Img multiscaleApply(Img src, function<Img(Img)> func) {
 		std::vector<Img> origScales = ::buildGaussianPyramid(src);
-		std::vector<Img> updatedScales;
+		std::vector<Img> updatedScales(origScales.size());
 		static const auto filter = ci::FilterGaussian();
-		for (auto s : origScales)
+		/*for (auto s : origScales)
 		{
 			updatedScales.push_back(func(s));
-		}
-		auto& weights = getLevelWeights(updatedScales.size());
+		}*/
+		const int last = origScales.size() - 1;
+		updatedScales[last] = func(origScales[last]);
+		auto weights = getLevelWeights(origScales.size());
 		for (int i = updatedScales.size() - 1; i >= 1; i--) {
 			auto diff = ::subtract(updatedScales[i], origScales[i]);
 			diff = ::multiply(diff, weights[i]);
-			auto upscaledDiff = ::resize(diff, updatedScales[i - 1].Size(), filter);
-			updatedScales[i - 1] = ::add(updatedScales[i - 1], upscaledDiff);
+			auto upscaledDiff = ::resize(diff, origScales[i - 1].Size(), filter);
+			auto& nextScale = updatedScales[i - 1];
+			nextScale = ::add(origScales[i - 1], upscaledDiff);
+			nextScale = func(nextScale);
+			forxy(nextScale) {
+				nextScale(p) = mulContrastize(nextScale(p), options.contrastizeStrength);
+			}
 		}
 		return updatedScales[0];
 	}
@@ -256,16 +317,14 @@ struct SApp : App {
 		else
 			img = updateSingleScale(img);
 
-		img = to01(img);
+		//img = to01(img);
 		forxy(img) {
-			auto& c = img(p);
-			c = ci::constrain(c, 0.0f, 1.0f);
-			c = mulContrastize(c, options.contrastizeStrength);
+			//img(p) = mulContrastize(img(p), options.contrastizeStrength);
 		}
-
 	}
 
 	static float mulContrastize(float i, float contrastizeStrength) {
+		i = ci::constrain(i, 0.0f, 1.0f);
 		const bool invert = i > .5f;
 		if (invert) {
 			i = 1.0f - i;
