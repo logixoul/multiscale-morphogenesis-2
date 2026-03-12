@@ -12,18 +12,40 @@
 
 #include "CrossThreadCallQueue.h"
 
-template<class T>
-struct compareVec
-{
-	bool operator() (const glm::vec<2, T>& lhs, const glm::vec<2, T>& rhs) const
-	{
-		if (lhs.x < rhs.x) return -1;
-		if (lhs.x > rhs.x) return 1;
-		return lhs.y < rhs.y;
-	}
+static vec2 perpLeft(vec2 const& v) {
+	return vec2(-v.y, v.x);
 };
 
-Array2D<vec3> resize(Array2D<vec3> src, ivec2 dstSize, const ci::FilterBase& filter)
+using Img = Array2D<float>;
+static Img subtract(Img const& a, Img const& b) {
+	Img result = a.clone();
+	for (int i = 0; i < result.area; i++) {
+		result.data[i] -= b.data[i];
+	}
+	return result;
+}
+static Img add(Img const& a, Img const& b) {
+	Img result = a.clone();
+	for (int i = 0; i < result.area; i++) {
+		result.data[i] += b.data[i];
+	}
+	return result;
+}
+template<class T, class FetchFunc>
+static Array2D<T> gauss3Better(Array2D<T> src) {
+	T zero = ::zero<T>();
+	Array2D<T> dst1(src.w, src.h);
+	Array2D<T> dst2(src.w, src.h);
+	forxy(dst1)
+		dst1(p) = .25f * (2 * FetchFunc::fetch(src, p.x, p.y) + FetchFunc::fetch(src, p.x - 1, p.y) + FetchFunc::fetch(src, p.x + 1, p.y));
+	forxy(dst2)
+		dst2(p) = .25f * (2 * FetchFunc::fetch(dst1, p.x, p.y) + FetchFunc::fetch(dst1, p.x, p.y - 1) + FetchFunc::fetch(dst1, p.x, p.y + 1));
+	return dst2;
+}
+
+
+#if 0
+static Array2D<vec3> resize(Array2D<vec3> src, ivec2 dstSize, const ci::FilterBase& filter)
 {
 	ci::SurfaceT<float> tmpSurface(
 		(float*)src.data, src.w, src.h, /*rowBytes*/sizeof(vec3) * src.w, ci::SurfaceChannelOrder::RGB);
@@ -31,8 +53,9 @@ Array2D<vec3> resize(Array2D<vec3> src, ivec2 dstSize, const ci::FilterBase& fil
 	Array2D<vec3> resultArray = resizedSurface;
 	return resultArray;
 }
+#endif
 
-Array2D<float> resize(Array2D<float> src, ivec2 dstSize, const ci::FilterBase& filter)
+static Array2D<float> resize(Array2D<float> src, ivec2 dstSize, const ci::FilterBase& filter)
 {
 	ci::ChannelT<float> tmpSurface(
 		src.w, src.h, /*rowBytes*/sizeof(float) * src.w, 1, src.data);
@@ -41,11 +64,21 @@ Array2D<float> resize(Array2D<float> src, ivec2 dstSize, const ci::FilterBase& f
 	Array2D<float> resultArray = resizedSurface;
 	return resultArray;
 }
-gl::TextureRef redToLuminance(gl::TextureRef const& in) {
+static gl::TextureRef redToLuminance(gl::TextureRef const& in) {
 	return shade2(in,
 		"_out.rgb = vec3(fetch1());",
 		ShadeOpts().ifmt(GL_RGBA16F)
 	);
+}
+static float blendHardLight(float base, float blend) {
+	if (blend < 0.5f) {
+		// Multiply: darkens the image based on the blend layer
+		return 2.0f * base * blend;
+	}
+	else {
+		// Screen: lightens the image based on the blend layer
+		return 1.0f - 2.0f * (1.0f - base) * (1.0f - blend);
+	}
 }
 
 int wsx = 700, wsy = 700;
@@ -53,7 +86,6 @@ int sx = 256;
 int sy = 256;
 Array2D<float> img(sx, sy);
 bool pause2 = false;
-std::map<int, gl::TextureRef> texs;
 
 struct SApp : App {
 	void setup()
@@ -103,7 +135,6 @@ struct SApp : App {
 		auto img = aImg.clone();
 
 		auto gradients = ::get_gradients<float, WrapModes::GetClamped>(img);
-		static const auto perpLeft = [&](vec2 v) { return vec2(-v.y, v.x); };
 		auto img2 = img.clone();
 		for (int x = 0; x < img.w; x++)
 		{
@@ -126,27 +157,10 @@ struct SApp : App {
 		forxy(img) {
 			float floatY = p.y / (float)img.h;
 			floatY = glm::mix(blendWeaken, 1.0f - blendWeaken, floatY);
-			if (floatY < .5) {
-				img(p) *= floatY * 2;
-			}
-			else {
-				img(p) = glm::mix(img(p), 1.0f, (floatY - 0.5f) * 2);
-			}
+			img(p) = blendHardLight(img(p), floatY);
 		}
 		return img;
 	}
-	template<class T, class FetchFunc>
-	static Array2D<T> gauss3Better(Array2D<T> src) {
-		T zero = ::zero<T>();
-		Array2D<T> dst1(src.w, src.h);
-		Array2D<T> dst2(src.w, src.h);
-		forxy(dst1)
-			dst1(p) = .25f * (2 * FetchFunc::fetch(src, p.x, p.y) + FetchFunc::fetch(src, p.x - 1, p.y) + FetchFunc::fetch(src, p.x + 1, p.y));
-		forxy(dst2)
-			dst2(p) = .25f * (2 * FetchFunc::fetch(dst1, p.x, p.y) + FetchFunc::fetch(dst1, p.x, p.y - 1) + FetchFunc::fetch(dst1, p.x, p.y + 1));
-		return dst2;
-	}
-	using Img = Array2D<float>;
 	Img multiscaleApply(Img src, function<Img(Img)> func) {
 		int size = std::min(src.w, src.h);
 		auto state = src.clone();
@@ -161,26 +175,16 @@ struct SApp : App {
 		}
 		vector<Img> origScales = scales;
 		for (auto& s : origScales) s = s.clone();
-		int lastLevel = 0;
-		for (int i = scales.size() - 1; i >= lastLevel; i--) {
+		for (auto& s : scales) s = func(s);
+
+		for (int i = scales.size() - 1; i >= 1; i--) {
 			auto& thisScale = scales[i];
 			auto& thisOrigScale = origScales[i];
-			auto transformed = func(thisScale);
-			auto diff = empty_like(transformed);
-			for (int j = 0; j < diff.area; j++) {
-				diff.data[j] = transformed.data[j] - thisOrigScale.data[j];
-			}
+			auto diff = subtract(scales[i], origScales[i]);
 			float iNormalized = -1+2*i / float(scales.size() - 1);
 			float w = exp(weightFactor*iNormalized);
 			forxy(diff) {
 				diff(p) *= w;
-			}
-			if (i == lastLevel)
-			{
-				for (int j = 0; j < transformed.area; j++) {
-					scales[lastLevel].data[j] = thisOrigScale.data[j] + diff.data[j];//.clone();
-				}
-				break;
 			}
 			auto& nextScaleUp = scales[i - 1];
 			auto upscaledDiff = ::resize(diff, nextScaleUp.Size(), filter);
@@ -188,7 +192,7 @@ struct SApp : App {
 				nextScaleUp(p) += upscaledDiff(p);
 			}
 		}
-		return scales[lastLevel];
+		return scales[0];
 	}
 	float abc;
 	float contrastizeFactor;
