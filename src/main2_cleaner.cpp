@@ -182,7 +182,8 @@ struct SApp : App {
 	{
 		auto img = aImg.clone();
 
-		auto gradients = ::get_gradients<float, WrapModes::GetClamped>(img);
+		auto blurredImg = gaussianBlur3x3<float, WrapModes::GetClamped>(img);
+		auto gradients = ::get_gradients<float, WrapModes::GetClamped>(blurredImg);
 		auto img2 = img.clone();
 		forxy(img) {
 			vec2 pf = vec2(p);
@@ -191,8 +192,8 @@ struct SApp : App {
 			vec2 gradP = perpLeft(grad);
 
 			float val = img(p);
-			float valLeft = getBilinear<float, WrapModes::GetClamped>(img, pf + gradP);
-			float valRight = getBilinear<float, WrapModes::GetClamped>(img, pf - gradP);
+			float valLeft = getBilinear<float, WrapModes::GetClamped>(blurredImg, pf + gradP);
+			float valRight = getBilinear<float, WrapModes::GetClamped>(blurredImg, pf - gradP);
 			float add = (val - (valLeft + valRight) * .5f);
 			aaPoint<float, WrapModes::GetClamped>(img2, pf - grad * add, add * options.morphogenesisStrength);
 		}
@@ -214,6 +215,17 @@ struct SApp : App {
 		float iNormalized = level / float(maxLevel - 1);
 		return exp(options.weightFactor*iNormalized);
 	}
+	std::vector<float> getLevelWeights(int numLevels) const {
+		std::vector<float> result;
+		for (int i = 0; i < numLevels; i++) {
+			result.push_back(getLevelWeight(i, numLevels));
+		}
+		float sum = std::accumulate(result.begin(), result.end(), 0.0f);
+		for(auto& weight : result) {
+		//	weight /= sum;
+		}
+		return result;
+	}
 	Img multiscaleApply(Img src, function<Img(Img)> func) {
 		std::vector<Img> origScales = ::buildGaussianPyramid(src);
 		std::vector<Img> updatedScales;
@@ -222,11 +234,10 @@ struct SApp : App {
 		{
 			updatedScales.push_back(func(s));
 		}
-
+		auto& weights = getLevelWeights(updatedScales.size());
 		for (int i = updatedScales.size() - 1; i >= 1; i--) {
 			auto diff = ::subtract(updatedScales[i], origScales[i]);
-			float weight = getLevelWeight(i, updatedScales.size());
-			diff = ::multiply(diff, weight);
+			diff = ::multiply(diff, weights[i]);
 			auto upscaledDiff = ::resize(diff, updatedScales[i - 1].Size(), filter);
 			updatedScales[i - 1] = ::add(updatedScales[i - 1], upscaledDiff);
 		}
