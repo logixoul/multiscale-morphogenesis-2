@@ -31,7 +31,8 @@ namespace ThisSketch {
 					//cfg2::getFloat("contrastizeFactor", 0.01f, 1.0, 10, 1.0f),
 					1.0f,
 					cfg2::getFloat("blendWeaken", 0.001f, 0.1, .5f, .490f),
-					cfg2::getFloat("weightFactor", 0.1f, 0.01f, 60.0f, 0.1f, ImGuiSliderFlags_Logarithmic),
+					0.1f,
+					//cfg2::getFloat("weightFactor", 0.1f, 0.01f, 60.0f, 0.1f, ImGuiSliderFlags_Logarithmic),
 					cfg2::getBool("multiscale", true),
 					cfg2::getBool("binarizePostprocessing", true),
 					cfg2::getFloat("highPassStrength", 0.01f, 0.0f, 1.0f, 1.0f)
@@ -130,11 +131,11 @@ namespace ThisSketch {
 			updatedScales[last] = func(origScales[last]);
 			auto weights = getLevelWeights(origScales.size());
 			for (int i = updatedScales.size() - 1; i >= 1; i--) {
-				auto diff = ThisSketch::subtract(updatedScales[i], origScales[i]);
-				diff = ThisSketch::multiply(diff, weights[i]);
+				auto diff = subtract(updatedScales[i], origScales[i]);
+				diff = multiply(diff, weights[i]);
 				auto upscaledDiff = ThisSketch::resize(diff, origScales[i - 1].Size(), filter);
 				auto& nextScale = updatedScales[i - 1];
-				nextScale = ThisSketch::add(origScales[i - 1], upscaledDiff);
+				nextScale = add(origScales[i - 1], upscaledDiff);
 				nextScale = func(nextScale);
 			}
 			return updatedScales[0];
