@@ -211,7 +211,8 @@ struct SApp : App {
 		static Options get() {
 			return Options{
 				cfg2::getFloat("morphogenesis", .02, 0.068, 20, 0.658, ImGuiSliderFlags_Logarithmic),
-				cfg2::getFloat("contrastizeFactor", 0.01f, 1.0, 10, 1.0f),
+				//cfg2::getFloat("contrastizeFactor", 0.01f, 1.0, 10, 1.0f),
+				1.0f,
 				cfg2::getFloat("blendWeaken", 0.01f, 0.1, .5f, .490f),
 				cfg2::getFloat("weightFactor", 0.1f, 0.01f, 60.0f, 0.1f, ImGuiSliderFlags_Logarithmic),
 				cfg2::getBool("multiscale", true),
@@ -432,18 +433,24 @@ struct SApp : App {
 		auto imgHighpassed = dl<float>(imgTexHighpassed);
 
 		auto pyramid = buildGaussianPyramid(imgHighpassed);
-		auto stateTex = maketex(img.w, img.h, GL_R16F, false, true);
+		auto stateTex = maketex(wsx, wsy, GL_R16F, false, true);
 		for(int i = pyramid.size() - 1; i >= 0; i--) {
 			auto& thisLevel = pyramid[i];
 			auto thisLevelTex = gtex(thisLevel);
-			thisLevelTex = shade2(thisLevelTex,
+			auto thisLevelTexContrastized = shade2(thisLevelTex,
 				"float f = fetch1();"
 				"float fw = fwidth(f);"
-				"f = smoothstep(.0-fw/2.0, .0+fw/2.0, f);"
-				"_out.r = f;", ShadeOpts().dstRectSize(img.Size()));
-			stateTex = op(stateTex) + thisLevelTex;
+				"f = smoothstep(-fw/2.0, fw/2.0, f);"
+				"_out.r = f;", ShadeOpts().dstRectSize(ivec2(wsx, wsy)));
+			stateTex = op(stateTex) + thisLevelTexContrastized;
 		}
 		stateTex = op(stateTex) / float(pyramid.size());
+		stateTex = shade2(stateTex, MULTILINE(
+			float val = fetch1();
+			vec3 fire = vec3(min(val * 1.5, 1.), pow(val, 2.5), pow(val, 12.));
+			_out.rgb = fire;
+		),
+			ShadeOpts().ifmt(GL_RGBA16F));
 		return stateTex;
 	}
 	void stefanDraw()
@@ -457,7 +464,10 @@ struct SApp : App {
 			if (options.binarizePostprocessing) {
 				tex = postprocessV2();
 			}
-			gl::draw(redToLuminance(tex), getWindowBounds());
+			else {
+				tex = redToLuminance(tex);
+			}
+			gl::draw(tex, getWindowBounds());
 		});
 	}
 };
