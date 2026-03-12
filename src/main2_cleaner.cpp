@@ -31,6 +31,20 @@ static Img add(Img const& a, Img const& b) {
 	}
 	return result;
 }
+static Img multiply(Img const& a, Img const& b) {
+	Img result = a.clone();
+	for (int i = 0; i < result.area; i++) {
+		result.data[i] *= b.data[i];
+	}
+	return result;
+}
+static Img multiply(Img const& a, float scalar) {
+	Img result = a.clone();
+	for (int i = 0; i < result.area; i++) {
+		result.data[i] *= scalar;
+	}
+	return result;
+}
 template<class T, class FetchFunc>
 static Array2D<T> gauss3Better(Array2D<T> src) {
 	T zero = ::zero<T>();
@@ -42,6 +56,7 @@ static Array2D<T> gauss3Better(Array2D<T> src) {
 		dst2(p) = .25f * (2 * FetchFunc::fetch(dst1, p.x, p.y) + FetchFunc::fetch(dst1, p.x, p.y - 1) + FetchFunc::fetch(dst1, p.x, p.y + 1));
 	return dst2;
 }
+
 
 
 #if 0
@@ -64,6 +79,21 @@ static Array2D<float> resize(Array2D<float> src, ivec2 dstSize, const ci::Filter
 	Array2D<float> resultArray = resizedSurface;
 	return resultArray;
 }
+
+static std::vector<Img> buildGaussianPyramid(Img src) {
+	std::vector<Img> scales;
+	int size = std::min(src.w, src.h);
+	auto state = src.clone();
+	static const auto filter = ci::FilterGaussian();
+	while (size > 2)
+	{
+		scales.push_back(state);
+		state = ::resize(state, state.Size() / 2, filter);
+		size /= 2;
+	}
+	return scales;
+}
+
 static gl::TextureRef redToLuminance(gl::TextureRef const& in) {
 	return shade2(in,
 		"_out.rgb = vec3(fetch1());",
@@ -161,38 +191,27 @@ struct SApp : App {
 		}
 		return img;
 	}
+	float getLevelWeight(int level, int maxLevel) const {
+		float iNormalized = level / float(maxLevel - 1);
+		return exp(weightFactor*iNormalized);
+	}
 	Img multiscaleApply(Img src, function<Img(Img)> func) {
-		int size = std::min(src.w, src.h);
-		auto state = src.clone();
-		vector<Img> scales;
-		auto filter = ci::FilterGaussian();
-		
-		while (size > 2)
+		std::vector<Img> origScales = ::buildGaussianPyramid(src);
+		std::vector<Img> updatedScales;
+		static const auto filter = ci::FilterGaussian();
+		for (auto s : origScales)
 		{
-			scales.push_back(state);
-			state = ::resize(state, state.Size() / 2, filter);
-			size /= 2;
+			updatedScales.push_back(func(s));
 		}
-		vector<Img> origScales = scales;
-		for (auto& s : origScales) s = s.clone();
-		for (auto& s : scales) s = func(s);
 
-		for (int i = scales.size() - 1; i >= 1; i--) {
-			auto& thisScale = scales[i];
-			auto& thisOrigScale = origScales[i];
-			auto diff = subtract(scales[i], origScales[i]);
-			float iNormalized = -1+2*i / float(scales.size() - 1);
-			float w = exp(weightFactor*iNormalized);
-			forxy(diff) {
-				diff(p) *= w;
-			}
-			auto& nextScaleUp = scales[i - 1];
-			auto upscaledDiff = ::resize(diff, nextScaleUp.Size(), filter);
-			forxy(nextScaleUp) {
-				nextScaleUp(p) += upscaledDiff(p);
-			}
+		for (int i = updatedScales.size() - 1; i >= 1; i--) {
+			auto diff = ::subtract(updatedScales[i], origScales[i]);
+			float w = getLevelWeight(i, updatedScales.size());
+			diff = ::multiply(diff, w);
+			auto upscaledDiff = ::resize(diff, updatedScales[i - 1].Size(), filter);
+			updatedScales[i - 1] = ::add(updatedScales[i - 1], upscaledDiff);
 		}
-		return scales[0];
+		return updatedScales[0];
 	}
 	float abc;
 	float contrastizeFactor;
@@ -202,8 +221,8 @@ struct SApp : App {
 	void stefanUpdate() {
 		abc = cfg2::getFloat("morphogenesis", .02, 0.068, 20, 1.35, ImGuiSliderFlags_Logarithmic);
 		contrastizeFactor = cfg2::getFloat("contrastizeFactor", 0.01f, 1.0, 10, 1.0f);
-		blendWeaken = cfg2::getFloat("blendWeaken", 0.01f, 0.1, .5f, .45f);
-		weightFactor = cfg2::getFloat("weightFactor", 0.1f, 0.1, 60.0f, 0.37, ImGuiSliderFlags_Logarithmic);
+		blendWeaken = cfg2::getFloat("blendWeaken", 0.01f, 0.1, .5f, .49f);
+		weightFactor = cfg2::getFloat("weightFactor", 0.1f, 0.01f, 60.0f, 0.1f, ImGuiSliderFlags_Logarithmic);
 		bool multiscale = cfg2::getBool("multiscale", true);
 		
 		if (pause2) {
