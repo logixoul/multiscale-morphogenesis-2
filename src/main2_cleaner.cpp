@@ -11,6 +11,7 @@
 #include "stefanfw.h"
 
 #include "CrossThreadCallQueue.h"
+#include "gpuBlurClaude.h"
 
 static vec2 perpLeft(vec2 const& v) {
 	return vec2(-v.y, v.x);
@@ -407,10 +408,30 @@ struct SApp : App {
 		);
 		return tex;
 	}
+	static gl::TextureRef gpuHighpass(gl::TextureRef in, float strength) {
+		auto inCentered = shade2(in,
+			"float f = fetch1();"
+			"_out.r = f - .5;"
+		);
+		auto blurred = gpuBlurClaude::blurWithInvKernel(inCentered);
+		auto highpassed = shade2(inCentered, blurred, MULTILINE(
+			float f = fetch1();
+			float fBlurred = fetch1(tex2);
+			float highPassed = f - fBlurred*highPassStrength;
+			_out.r = highPassed;
+			), ShadeOpts().uniform("highPassStrength", strength)
+		);
+		return highpassed;
+	}
 	gl::TextureRef postprocessV2() {
 		auto imgClamped = img.clone();
 		forxy(imgClamped) imgClamped(p) = ci::constrain(imgClamped(p), 0.0f, 1.0f);
-		auto pyramid = buildGaussianPyramid(imgClamped);
+
+		auto imgTex = gtex(imgClamped);
+		auto imgTexHighpassed = gpuHighpass(imgTex, options.highPassStrength);
+		auto imgHighpassed = dl<float>(imgTexHighpassed);
+
+		auto pyramid = buildGaussianPyramid(imgHighpassed);
 		auto stateTex = maketex(img.w, img.h, GL_R16F, false, true);
 		for(int i = pyramid.size() - 1; i >= 0; i--) {
 			auto& thisLevel = pyramid[i];
@@ -418,7 +439,7 @@ struct SApp : App {
 			thisLevelTex = shade2(thisLevelTex,
 				"float f = fetch1();"
 				"float fw = fwidth(f);"
-				"f = smoothstep(.5-fw/2.0, .5+fw/2.0, f);"
+				"f = smoothstep(.0-fw/2.0, .0+fw/2.0, f);"
 				"_out.r = f;", ShadeOpts().dstRectSize(img.Size()));
 			stateTex = op(stateTex) + thisLevelTex;
 		}

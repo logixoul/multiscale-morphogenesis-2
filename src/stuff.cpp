@@ -172,7 +172,7 @@ void setWrapBlack(gl::TextureRef tex) {
 	// I think the border color is transparent black by default. It doesn't hurt that it is transparent.
 	bind(tex);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
 	float black[] = { 0.0f, 0.0f, 0.0f, 0.0f };
 	glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, black);
 	//tex->setWrap(GL_CLAMP_TO_BORDER, GL_CLAMP_TO_BORDER);

@@ -160,6 +160,7 @@
     <ClCompile Include="gpgpu.cpp" />
     <ClCompile Include="colorspaces.cpp" />
     <ClCompile Include="cfg1.cpp" />
+    <ClCompile Include="gpuBlurClaude.cpp" />
     <ClCompile Include="IntegratedConsole.cpp" />
     <ClCompile Include="main2_cleaner.cpp" />
     <ClCompile Include="MyTimer.cpp" />
@@ -196,6 +197,7 @@
     <ClInclude Include="gpgpu.h" />
     <ClInclude Include="gpuBlur2_5.h">
     </ClInclude>
+    <ClInclude Include="gpuBlurClaude.h" />
     <ClInclude Include="IntegratedConsole.h" />
     <ClInclude Include="precompiled.h" />
     <ClInclude Include="shade.h" />
