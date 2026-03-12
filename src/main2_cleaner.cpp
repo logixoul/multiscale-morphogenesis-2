@@ -407,6 +407,22 @@ struct SApp : App {
 		);
 		return tex;
 	}
+	gl::TextureRef postprocessV2() {
+		auto pyramid = buildGaussianPyramid(img);
+		auto stateTex = maketex(img.w, img.h, GL_R16F, false, true);
+		for(int i = pyramid.size() - 1; i >= 0; i--) {
+			auto& thisLevel = pyramid[i];
+			auto thisLevelTex = gtex(thisLevel);
+			thisLevelTex = shade2(thisLevelTex,
+				"float f = fetch1();"
+				"float fw = fwidth(f);"
+				"f = smoothstep(.5-fw/2.0, .5+fw/2.0, f);"
+				"_out.r = f;", ShadeOpts().dstRectSize(img.Size()));
+			stateTex = op(stateTex) + thisLevelTex;
+		}
+		stateTex = op(stateTex) / float(pyramid.size());
+		return stateTex;
+	}
 	void stefanDraw()
 	{
 		gl::setMatricesWindow(vec2(wsx, wsy), false);
@@ -416,7 +432,7 @@ struct SApp : App {
 		sw::timeit("draw", [&]() {
 			gl::TextureRef tex = gtex(img);
 			if (options.binarizePostprocessing) {
-				tex = postprocess();
+				tex = postprocessV2();
 			}
 			gl::draw(redToLuminance(tex), getWindowBounds());
 		});
