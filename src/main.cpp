@@ -455,7 +455,7 @@ struct SApp : App {
 			"float add = (val - (valLeft + valRight) * .5f);"
 			//"if(add < 0.0) add = 0;"
 			"_out.r = add * abc;"
-			, ShadeOpts().uniform("abc", abc),
+			, ShadeOpts().uniform("abc", morphogenesisStrength),
 			"vec2 perpLeft(vec2 v) {"
 			"	return vec2(-v.y, v.x);"
 			"}"
@@ -579,13 +579,13 @@ struct SApp : App {
 		}
 		return scales[lastLevel];
 	}
-	float abc;
-	float contrastizeFactor;
+	float morphogenesisStrength;
+	float contrastizeStrength;
 	float blendWeaken;
 	float weightFactor;
 	void stefanUpdate() {
-		abc = cfg2::getFloat("morphogenesis", .02, 0.068, 20, 2.418, ImGuiSliderFlags_Logarithmic);
-		contrastizeFactor = cfg2::getFloat("contrastizeFactor", 1.f, 0.01, 100, 0.01f, ImGuiSliderFlags_Logarithmic);
+		morphogenesisStrength = cfg2::getFloat("morphogenesis", .02, 0.068, 20, 2.418, ImGuiSliderFlags_Logarithmic);
+		contrastizeStrength = cfg2::getFloat("contrastizeFactor", 1.f, 0.01, 100, 0.01f, ImGuiSliderFlags_Logarithmic);
 		blendWeaken = cfg2::getFloat("blendWeaken", 0.01f, 0.1, .499, .499f);
 		weightFactor = cfg2::getFloat("weightFactor", 0.1f, 0.1, 30, 30, ImGuiSliderFlags_Logarithmic);
 
@@ -600,7 +600,7 @@ struct SApp : App {
 			auto& c = img(p);
 			c = ci::constrain(c, 0.0f, 1.0f);
 			auto c2 = 3.0f * c * c - 2.0f * c * c * c;
-			c = mix(c, c2, contrastizeFactor);
+			c = mix(c, c2, contrastizeStrength);
 			c = ci::constrain(c, 0.0f, 1.0f);
 		}*/
 

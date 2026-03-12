@@ -46,7 +46,7 @@ static Img multiply(Img const& a, float scalar) {
 	return result;
 }
 template<class T, class FetchFunc>
-static Array2D<T> gauss3Better(Array2D<T> src) {
+static Array2D<T> gaussianBlur3x3(Array2D<T> src) {
 	T zero = ::zero<T>();
 	Array2D<T> dst1(src.w, src.h);
 	Array2D<T> dst2(src.w, src.h);
@@ -118,6 +118,24 @@ Array2D<float> img(sx, sy);
 bool pause2 = false;
 
 struct SApp : App {
+	struct Options {
+		float morphogenesisStrength;
+		float contrastizeStrength;
+		float blendWeaken;
+		float weightFactor;
+		bool multiscale;
+
+		static Options get() {
+			return Options{
+				cfg2::getFloat("morphogenesis", .02, 0.068, 20, 1.35, ImGuiSliderFlags_Logarithmic),
+				cfg2::getFloat("contrastizeFactor", 0.01f, 1.0, 10, 1.0f),
+				cfg2::getFloat("blendWeaken", 0.01f, 0.1, .5f, .49f),
+				cfg2::getFloat("weightFactor", 0.1f, 0.01f, 60.0f, 0.1f, ImGuiSliderFlags_Logarithmic),
+				cfg2::getBool("multiscale", true)
+			};
+		}
+	};
+
 	void setup()
 	{
 		reset();
@@ -166,34 +184,30 @@ struct SApp : App {
 
 		auto gradients = ::get_gradients<float, WrapModes::GetClamped>(img);
 		auto img2 = img.clone();
-		for (int x = 0; x < img.w; x++)
-		{
-			for (int y = 0; y < img.h; y++)
-			{
-				vec2 p = vec2(x, y);
-				vec2 grad = safeNormalized(gradients(x, y));
+		forxy(img) {
+			vec2 pf = vec2(p);
+			vec2 grad = safeNormalized(gradients(p));
 
-				vec2 gradP = perpLeft(grad);
+			vec2 gradP = perpLeft(grad);
 
-				float val = img(x, y);
-				float valLeft = getBilinear<float, WrapModes::GetClamped>(img, p + gradP);
-				float valRight = getBilinear<float, WrapModes::GetClamped>(img, p - gradP);
-				float add = (val - (valLeft + valRight) * .5f);
-				aaPoint<float, WrapModes::GetClamped>(img2, p - grad * add, add * abc);
-			}
+			float val = img(p);
+			float valLeft = getBilinear<float, WrapModes::GetClamped>(img, pf + gradP);
+			float valRight = getBilinear<float, WrapModes::GetClamped>(img, pf - gradP);
+			float add = (val - (valLeft + valRight) * .5f);
+			aaPoint<float, WrapModes::GetClamped>(img2, pf - grad * add, add * options.morphogenesisStrength);
 		}
-		img = gauss3Better<float, WrapModes::GetClamped>(img2);
+		img = gaussianBlur3x3<float, WrapModes::GetClamped>(img2);
 		
 		forxy(img) {
 			float floatY = p.y / (float)img.h;
-			floatY = glm::mix(blendWeaken, 1.0f - blendWeaken, floatY);
+			floatY = glm::mix(options.blendWeaken, 1.0f - options.blendWeaken, floatY);
 			img(p) = blendHardLight(img(p), floatY);
 		}
 		return img;
 	}
 	float getLevelWeight(int level, int maxLevel) const {
 		float iNormalized = level / float(maxLevel - 1);
-		return exp(weightFactor*iNormalized);
+		return exp(options.weightFactor*iNormalized);
 	}
 	Img multiscaleApply(Img src, function<Img(Img)> func) {
 		std::vector<Img> origScales = ::buildGaussianPyramid(src);
@@ -206,29 +220,21 @@ struct SApp : App {
 
 		for (int i = updatedScales.size() - 1; i >= 1; i--) {
 			auto diff = ::subtract(updatedScales[i], origScales[i]);
-			float w = getLevelWeight(i, updatedScales.size());
-			diff = ::multiply(diff, w);
+			float weight = getLevelWeight(i, updatedScales.size());
+			diff = ::multiply(diff, weight);
 			auto upscaledDiff = ::resize(diff, updatedScales[i - 1].Size(), filter);
 			updatedScales[i - 1] = ::add(updatedScales[i - 1], upscaledDiff);
 		}
 		return updatedScales[0];
 	}
-	float abc;
-	float contrastizeFactor;
-	float blendWeaken;
-	float weightFactor;
-	
+	Options options;
 	void stefanUpdate() {
-		abc = cfg2::getFloat("morphogenesis", .02, 0.068, 20, 1.35, ImGuiSliderFlags_Logarithmic);
-		contrastizeFactor = cfg2::getFloat("contrastizeFactor", 0.01f, 1.0, 10, 1.0f);
-		blendWeaken = cfg2::getFloat("blendWeaken", 0.01f, 0.1, .5f, .49f);
-		weightFactor = cfg2::getFloat("weightFactor", 0.1f, 0.01f, 60.0f, 0.1f, ImGuiSliderFlags_Logarithmic);
-		bool multiscale = cfg2::getBool("multiscale", true);
-		
+		this->options = Options::get();
+
 		if (pause2) {
 			return;
 		}
-		if(multiscale)
+		if(options.multiscale)
 			img = multiscaleApply(img, [this](auto arg) { return updateSingleScale(arg); });
 		else
 			img = updateSingleScale(img);
@@ -237,18 +243,18 @@ struct SApp : App {
 		forxy(img) {
 			auto& c = img(p);
 			c = ci::constrain(c, 0.0f, 1.0f);
-			c = mulContrastize(c, contrastizeFactor);
+			c = mulContrastize(c, options.contrastizeStrength);
 		}
 
 	}
 
-	static float mulContrastize(float i, float contrastizeFactor) {
+	static float mulContrastize(float i, float contrastizeStrength) {
 		const bool invert = i > .5f;
 		if (invert) {
 			i = 1.0f - i;
 		}
 		i *= 2.0f;
-		i = pow(i, contrastizeFactor);
+		i = pow(i, contrastizeStrength);
 		i *= .5f;
 		if (invert) {
 			i = 1.0f - i;
