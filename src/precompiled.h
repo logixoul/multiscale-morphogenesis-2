@@ -23,8 +23,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <iostream>
 #include <string>
 #include <complex>
-#undef min
-#undef max
+#include <numeric>
 #include <cinder/ip/Resize.h>
 #include <cinder/app/App.h>
 #include <cinder/app/RendererGl.h>
@@ -34,7 +33,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <cinder/gl/VboMesh.h>
 #include <cinder/gl/gl.h>
 #include <cinder/ImageIo.h> // todo rm?
-#include "cinder/CameraUi.h"
+//#include "cinder/CameraUi.h"
 
 
 //#include <cinder/Vector.h>
@@ -55,7 +54,7 @@ using namespace std::experimental;
 
 //#include <tuple>
 #include <queue>
-#include <opencv2/imgproc.hpp>
+//#include <opencv2/imgproc.hpp>
 //#include <thread>
 
 

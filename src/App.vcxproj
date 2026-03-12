@@ -149,7 +149,7 @@
     <ClCompile Include="CrossThreadCallQueue.cpp" />
     <ClCompile Include="cvstuff.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="easyfft.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
@@ -160,6 +160,7 @@
     <ClCompile Include="gpgpu.cpp" />
     <ClCompile Include="colorspaces.cpp" />
     <ClCompile Include="cfg1.cpp" />
+    <ClCompile Include="gpuBlurClaude.cpp" />
     <ClCompile Include="IntegratedConsole.cpp" />
     <ClCompile Include="main2_cleaner.cpp" />
     <ClCompile Include="MyTimer.cpp" />
@@ -196,6 +197,7 @@
     <ClInclude Include="gpgpu.h" />
     <ClInclude Include="gpuBlur2_5.h">
     </ClInclude>
+    <ClInclude Include="gpuBlurClaude.h" />
     <ClInclude Include="IntegratedConsole.h" />
     <ClInclude Include="precompiled.h" />
     <ClInclude Include="shade.h" />

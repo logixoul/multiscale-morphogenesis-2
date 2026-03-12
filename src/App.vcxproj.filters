@@ -61,6 +61,7 @@
     <ClCompile Include="CinderImGui.cpp" />
     <ClCompile Include="IntegratedConsole.cpp" />
     <ClCompile Include="main2_cleaner.cpp" />
+    <ClCompile Include="gpuBlurClaude.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="precompiled.h" />
@@ -98,6 +99,7 @@
     <ClInclude Include="CinderImGui.h" />
     <ClInclude Include="CinderImGuiConfig.h" />
     <ClInclude Include="IntegratedConsole.h" />
+    <ClInclude Include="gpuBlurClaude.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="hcl_lib.fs">

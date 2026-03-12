@@ -232,6 +232,7 @@ Array2D<vec2> get_gradients(Array2D<T> src)
 	return get_gradients<T, WrapModes::DefaultImpl>(src);
 }
 
+
 void mm(string desc, Array2D<float> arr);
 void mm(string desc, Array2D<vec3> arr);
 void mm(string desc, Array2D<vec2> arr);

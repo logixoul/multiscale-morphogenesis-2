@@ -224,29 +224,29 @@ inline Operable::Operable(gl::TextureRef aTex) {
 }
 
 Operable Operable::operator+(gl::TextureRef other) {
-	return Operable(shade2(tex, other, "_out.r = fetch1() + fetch1(tex2);"));
+	return Operable(shade2(tex, other, "_out = fetch4() + fetch4(tex2);"));
 }
 Operable Operable::operator-(gl::TextureRef other) {
-	return Operable(shade2(tex, other, "_out.r = fetch1() - fetch1(tex2);"));
+	return Operable(shade2(tex, other, "_out = fetch4() - fetch4(tex2);"));
 }
 Operable Operable::operator*(gl::TextureRef other) {
-	return Operable(shade2(tex, other, "_out.r = fetch1() * fetch1(tex2);"));
+	return Operable(shade2(tex, other, "_out = fetch4() * fetch4(tex2);"));
 }
 Operable Operable::operator/(gl::TextureRef other) {
-	return Operable(shade2(tex, other, "_out.r = fetch1() / fetch1(tex2);"));
+	return Operable(shade2(tex, other, "_out = fetch4() / fetch4(tex2);"));
 }
 
 void Operable::operator+=(gl::TextureRef other) {
-	tex = shade2(tex, other, "_out.r = fetch1() + fetch1(tex2);");
+	tex = shade2(tex, other, "_out = fetch4() + fetch4(tex2);");
 }
 void Operable::operator-=(gl::TextureRef other) {
-	tex = shade2(tex, other, "_out.r = fetch1() - fetch1(tex2);");
+	tex = shade2(tex, other, "_out = fetch4() - fetch4(tex2);");
 }
 void Operable::operator*=(gl::TextureRef other) {
-	tex = shade2(tex, other, "_out.r = fetch1() * fetch1(tex2);");
+	tex = shade2(tex, other, "_out = fetch4() * fetch4(tex2);");
 }
 void Operable::operator/=(gl::TextureRef other) {
-	tex = shade2(tex, other, "_out.r = fetch1() / fetch1(tex2);");
+	tex = shade2(tex, other, "_out = fetch4() / fetch4(tex2);");
 }
 float Operable::dot(gl::TextureRef other) {
 	return ::dot(tex, other);
