@@ -164,7 +164,8 @@ static std::vector<Img> buildGaussianPyramid(Img src, float scalePerLevel = 0.5f
 		if (size <= 2)
 			break;
 		scales.push_back(state);
-		state = ::resize(state, state.Size() / 2, filter);
+		ivec2 newSize = ivec2(vec2(state.Size()) * scalePerLevel);
+		state = ::resize(state, newSize, filter);
 	}
 	return scales;
 }
