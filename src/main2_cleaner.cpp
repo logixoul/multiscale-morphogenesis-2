@@ -408,7 +408,9 @@ struct SApp : App {
 		return tex;
 	}
 	gl::TextureRef postprocessV2() {
-		auto pyramid = buildGaussianPyramid(img);
+		auto imgClamped = img.clone();
+		forxy(imgClamped) imgClamped(p) = ci::constrain(imgClamped(p), 0.0f, 1.0f);
+		auto pyramid = buildGaussianPyramid(imgClamped);
 		auto stateTex = maketex(img.w, img.h, GL_R16F, false, true);
 		for(int i = pyramid.size() - 1; i >= 0; i--) {
 			auto& thisLevel = pyramid[i];
