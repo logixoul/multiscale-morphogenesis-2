@@ -15,27 +15,12 @@ namespace ThisSketch {
 
 	Array2D<float> img(256, 256);
 
-	/*template<class T>
-	class Option {
-		T value;
-	public:
-		Option(std::string const& name, toml::table& tbl) {
-			value = tbl["params." + name]["default"].value<T>();
-		}
-		T get() const {
-			return value;
-		}
-		operator T() const {
-			return get();
-		}
-	};*/
-
 	struct SApp : App {
 		struct Options {
 			float morphogenesisStrength;
 			const float contrastizeStrength = 1.0f;
 			float blendWeaken;
-			const float weightFactor = .1;
+			float weightFactor;
 			bool multiscale;
 			bool binarizePostprocessing;
 			float highPassStrength;
@@ -46,6 +31,7 @@ namespace ThisSketch {
 
 				morphogenesisStrength = cfg.getFloat("morphogenesisStrength");
 				blendWeaken = cfg.getFloat("blendWeaken");
+				weightFactor = cfg.getFloat("weightFactor");
 				multiscale = cfg.getBool("multiscale");
 				binarizePostprocessing = cfg.getBool("binarizePostprocessing");
 				highPassStrength = cfg.getFloat("highPassStrength");
@@ -157,6 +143,7 @@ namespace ThisSketch {
 				img = multiscaleApply(img, [this](auto arg) { return updateSingleScale(arg); });
 			else
 				img = updateSingleScale(img);
+			img = to01(img);
 		}
 
 		static gl::TextureRef gpuHighpass(gl::TextureRef in, float strength) {

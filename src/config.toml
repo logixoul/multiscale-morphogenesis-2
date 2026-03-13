@@ -1,7 +1,15 @@
 [param.morphogenesisStrength]
 type = "float"
 default = 0.658
-min = 0.068
+min = 0.0068
+max = 20.0
+speed = 0.02
+logarithmic = true
+
+[param.weightFactor]
+type = "float"
+default = 0.1
+min = 0.0068
 max = 20.0
 speed = 0.02
 logarithmic = true
