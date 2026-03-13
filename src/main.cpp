@@ -15,30 +15,48 @@ namespace ThisSketch {
 
 	Array2D<float> img(256, 256);
 
+	/*template<class T>
+	class Option {
+		T value;
+	public:
+		Option(std::string const& name, toml::table& tbl) {
+			value = tbl["params." + name]["default"].value<T>();
+		}
+		T get() const {
+			return value;
+		}
+		operator T() const {
+			return get();
+		}
+	};*/
+
 	struct SApp : App {
 		struct Options {
 			float morphogenesisStrength;
-			float contrastizeStrength;
-			float blendWeaken;
-			float weightFactor;
+			float contrastizeStrength = 1.0f;
+			float blendWeaken = .490f;
+			const float weightFactor = .1;
 			bool multiscale;
 			bool binarizePostprocessing;
 			float highPassStrength;
+			cfg2 cfg;
 
-			static Options get() {
-				return Options{
-					cfg2::getFloat("morphogenesis", .02, 0.068, 20, 0.658, ImGuiSliderFlags_Logarithmic),
-					//cfg2::getFloat("contrastizeFactor", 0.01f, 1.0, 10, 1.0f),
-					1.0f,
-					cfg2::getFloat("blendWeaken", 0.001f, 0.1, .5f, .490f),
-					0.1f,
-					//cfg2::getFloat("weightFactor", 0.1f, 0.01f, 60.0f, 0.1f, ImGuiSliderFlags_Logarithmic),
-					cfg2::getBool("multiscale", true),
-					cfg2::getBool("binarizePostprocessing", true),
-					cfg2::getFloat("highPassStrength", 0.01f, 0.0f, 1.0f, 1.0f)
-				};
+			Options() {
+			}
+			
+			void update() {
+				cfg.begin();
+
+				morphogenesisStrength = cfg.getFloat("morphogenesisStrength");
+				blendWeaken = cfg.getFloat("blendWeaken");
+				multiscale = cfg.getBool("multiscale");
+				binarizePostprocessing = cfg.getBool("binarizePostprocessing");
+				highPassStrength = cfg.getFloat("highPassStrength");
+
+				cfg.end();
 			}
 		};
+		Options options;
 
 		void setup()
 		{
@@ -48,18 +66,15 @@ namespace ThisSketch {
 
 			disableGLReadClamp();
 			stefanfw::eventHandler.subscribeToEvents(*this);
-
-			cfg2::init();
 		}
 
 		void update()
 		{
-			cfg2::begin();
+			options.update();
 			stefanfw::beginFrame();
 			stefanUpdate();
 			stefanDraw();
 			stefanfw::endFrame();
-			cfg2::end();
 		}
 		void keyDown(KeyEvent e)
 		{
@@ -140,10 +155,7 @@ namespace ThisSketch {
 			}
 			return updatedScales[0];
 		}
-		Options options;
 		void stefanUpdate() {
-			this->options = Options::get();
-
 			if (options.multiscale)
 				img = multiscaleApply(img, [this](auto arg) { return updateSingleScale(arg); });
 			else

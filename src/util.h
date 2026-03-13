@@ -101,7 +101,7 @@ enum nofill {};
 template<class T>
 struct Array2D;
 
-typedef glm::tvec3<byte> bytevec3;
+typedef glm::tvec3<::byte> bytevec3;
 
 void copyCvtData(ci::Surface8u const& surface, Array2D<bytevec3> dst);
 void copyCvtData(ci::Surface8u const& surface, Array2D<vec3> dst);

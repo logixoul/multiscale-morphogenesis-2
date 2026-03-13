@@ -3,11 +3,13 @@
 #include "CinderImGui.h"
 
 
-void cfg2::init()
+cfg2::cfg2()
 {
 	ImGui::Initialize();
 	ImGuiIO& io = ImGui::GetIO();
 	io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\segoeui.ttf", 18.0f);
+
+	tbl = toml::parse_file("config.toml");
 }
 
 void cfg2::begin()
@@ -28,19 +30,32 @@ template<class T> T& getOpt_Base(string const& name, T defaultValue) {
 	return m[name];
 }
 
-int cfg2::getInt(string const& name, int min, int max, int defaultValue, ImGuiSliderFlags flags) {
+/*int cfg2::getInt(string const& name, int min, int max, int defaultValue, ImGuiSliderFlags flags) {
+
 	auto& ref = getOpt_Base<int>(name, defaultValue);
 	ImGui::DragInt(name.c_str(), &ref, 1.0f, min, max, "%d", flags);
 	return ref;
-}
+}*/
 
-float cfg2::getFloat(string const& name, float speed, float min, float max, float defaultValue, ImGuiSliderFlags flags) {
-	auto& ref = getOpt_Base<float>(name, defaultValue);
-	ImGui::DragFloat(name.c_str(), &ref, speed, min, max, "%.3f", flags);
+float cfg2::getFloat(string const& name) {
+	auto subTable = tbl.at_path("param." + name);
+	float& ref = getOpt_Base<float>(name, subTable["default"].ref<double>());
+
+	ImGui::DragFloat(
+		name.c_str(),
+		&ref,
+		subTable["speed"].ref<double>(),
+		subTable["min"].ref<double>(),
+		subTable["max"].ref<double>(),
+		"%.3f",
+		subTable["logarithmic"].value_or<bool>(false) ? ImGuiSliderFlags_Logarithmic : ImGuiSliderFlags_None);
+
 	return ref;
 }
-bool cfg2::getBool(string const& name, bool defaultValue) {
-	auto& ref = getOpt_Base<bool>(name, defaultValue);
+
+bool cfg2::getBool(string const& name) {
+	auto val = tbl.at_path("param." + name);
+	auto& ref = getOpt_Base<bool>(name, val["default"].ref<bool>());
 	ImGui::Checkbox(name.c_str(), &ref);
 	return ref;
 }

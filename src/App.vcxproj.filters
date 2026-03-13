@@ -59,9 +59,9 @@
     </ClCompile>
     <ClCompile Include="cfg2.cpp" />
     <ClCompile Include="CinderImGui.cpp" />
-    <ClCompile Include="IntegratedConsole.cpp" />
-    <ClCompile Include="main2_cleaner.cpp" />
     <ClCompile Include="gpuBlurClaude.cpp" />
+    <ClCompile Include="main_old_3d.cpp" />
+    <ClCompile Include="ThisSketch_ImageProcessingHelpers.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="precompiled.h" />
@@ -98,8 +98,8 @@
     <ClInclude Include="cfg2.h" />
     <ClInclude Include="CinderImGui.h" />
     <ClInclude Include="CinderImGuiConfig.h" />
-    <ClInclude Include="IntegratedConsole.h" />
     <ClInclude Include="gpuBlurClaude.h" />
+    <ClInclude Include="ThisSketch_ImageProcessingHelpers.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="hcl_lib.fs">
@@ -120,5 +120,8 @@
     <Filter Include="lxlib">
       <UniqueIdentifier>{84946c29-52d8-4217-be6f-d040dd19abdb}</UniqueIdentifier>
     </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="config.toml" />
   </ItemGroup>
 </Project>

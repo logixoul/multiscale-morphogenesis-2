@@ -155,6 +155,4 @@ void pop_front(std::vector<T>& vec)
 
 void myGLFence();
 
-vector<string> toStrings(vector<filesystem::path> paths);
-
 void enableGlDebugOutput();
