@@ -33,17 +33,14 @@ namespace ThisSketch {
 	struct SApp : App {
 		struct Options {
 			float morphogenesisStrength;
-			float contrastizeStrength = 1.0f;
-			float blendWeaken = .490f;
+			const float contrastizeStrength = 1.0f;
+			float blendWeaken;
 			const float weightFactor = .1;
 			bool multiscale;
 			bool binarizePostprocessing;
 			float highPassStrength;
 			cfg2 cfg;
 
-			Options() {
-			}
-			
 			void update() {
 				cfg.begin();
 
