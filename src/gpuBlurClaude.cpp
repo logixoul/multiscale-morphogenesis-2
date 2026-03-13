@@ -5,20 +5,23 @@
 #include "stuff.h"
 
 namespace gpuBlurClaude {
-
-	gl::TextureRef blurWithInvKernel(gl::TextureRef const& src) {
-		// Build Gaussian pyramid. Each level is half the resolution of the previous.
-		std::vector<gl::TextureRef> levels;
-		levels.push_back(src);
-
+	std::vector<gl::TextureRef> buildGaussianPyramid(gl::TextureRef const& src, float scalePerLevel) {
+		std::vector<gl::TextureRef> result;
+		result.push_back(src);
 		auto state = src;
 		int minDim = std::min(src->getWidth(), src->getHeight());
 		while (minDim > 2) {
-			state = gpuBlur2_5::singleblur(state, .5f, .5f);
-			levels.push_back(state);
-			minDim /= 2;
+			state = gpuBlur2_5::singleblur(state, scalePerLevel, scalePerLevel, GL_CLAMP_TO_EDGE);
+			result.push_back(state);
+			minDim *= scalePerLevel;
 		}
+		return result;
+	}
 
+	gl::TextureRef blurWithInvKernel(gl::TextureRef const& src) {
+		// Build Gaussian pyramid. Each level is half the resolution of the previous.
+		std::vector<gl::TextureRef> levels = buildGaussianPyramid(src, .5f);
+		
 		// 1/r kernel in 2D: each octave contributes equal weight,
 		// so each pyramid level gets equal weight.
 		int numLevels = (int)levels.size();

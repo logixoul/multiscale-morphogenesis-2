@@ -142,6 +142,12 @@ namespace gpuBlur2_5 {
 			, lib);
 		return vscaled;
 	}
+	// todo: move this to stuff.cpp/h
+	static void setTextureBorderColor(gl::TextureRef tex, float r, float g, float b, float a) {
+		bind(tex);
+		float color[] = { r, g, b, a };
+		glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, color);
+	}
 	gl::TextureRef singleblur(gl::TextureRef src, float hscale, float vscale, GLenum wrap) {
 		GPU_SCOPE("singleblur");
 		//float gaussW = mouseY * 4 + .1;
@@ -173,18 +179,21 @@ namespace gpuBlur2_5 {
 			+ weights.str() +
 			"_out.rgb = w2 * (aM2 + aP2) + w1 * (aM1 + aP1) + w0 * a0;";
 
+		setWrap(src, wrap);
+		if (wrap == GL_CLAMP_TO_BORDER) {
+			setTextureBorderColor(src, 0, 0, 0, 0);
+		}
 		//setWrapBlack(src);
-		//setWrap(src, wrap);
-		setWrapBlack(src);
 		auto hscaled = shade2(src, shader,
 			ShadeOpts()
 				.scale(hscale, 1.0f)
 				.uniform("GB2_offsetX", 1.0f)
 				.uniform("GB2_offsetY", 0.0f)
 			);
-		//setWrapBlack(hscaled);
-		//setWrap(hscaled, wrap);
-		setWrapBlack(hscaled);
+		setWrap(hscaled, wrap);
+		if (wrap == GL_CLAMP_TO_BORDER) {
+			setTextureBorderColor(src, 0, 0, 0, 0);
+		}
 		auto vscaled = shade2(hscaled, shader,
 			ShadeOpts()
 			.uniform("GB2_offsetX", 0.0f)

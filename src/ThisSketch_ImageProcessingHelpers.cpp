@@ -1,6 +1,7 @@
 #include "precompiled.h"
 #include "ThisSketch_ImageProcessingHelpers.h"
 #include "stuff.h"
+#include "gpuBlurClaude.h"
 
 namespace ThisSketch {
 
@@ -65,7 +66,16 @@ namespace ThisSketch {
 		return resultArray;
 	}
 
-	std::vector<Img> buildGaussianPyramid(Img src, float scalePerLevel) {
+	Array2D<float> resizeViaGpu(Array2D<float> src, ivec2 dstSize)
+	{
+		auto tex = gtex(src);
+		auto resizedTex = shade2(tex,
+			"_out.r = fetch1();",
+			ShadeOpts().dstRectSize(dstSize));
+		return dl<float>(resizedTex);
+	}
+
+	std::vector<Img> buildGaussianPyramid_old(Img src, float scalePerLevel) {
 		std::vector<Img> scales;
 		auto state = src.clone();
 		static const auto filter = ci::FilterGaussian();
@@ -79,6 +89,16 @@ namespace ThisSketch {
 			state = ThisSketch::resize(state, newSize, filter);
 		}
 		return scales;
+	}
+
+	std::vector<Img> buildGaussianPyramid(Img src, float scalePerLevel) {
+		auto tex = gtex(src);
+		std::vector<gl::TextureRef> scales = gpuBlurClaude::buildGaussianPyramid(tex, scalePerLevel);
+		std::vector<Img> result;
+		for (auto& scale : scales) {
+			result.push_back(dl<float>(scale));
+		}
+		return result;
 	}
 
 	gl::TextureRef redToLuminance(gl::TextureRef const& in) {

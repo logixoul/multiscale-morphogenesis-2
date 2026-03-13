@@ -23,6 +23,7 @@ namespace ThisSketch {
 			float weightFactor;
 			bool multiscale;
 			bool binarizePostprocessing;
+			bool pyramidOld;
 			float highPassStrength;
 			cfg2 cfg;
 
@@ -34,6 +35,7 @@ namespace ThisSketch {
 				weightFactor = cfg.getFloat("weightFactor");
 				multiscale = cfg.getBool("multiscale");
 				binarizePostprocessing = cfg.getBool("binarizePostprocessing");
+				pyramidOld = cfg.getBool("pyramidOld");
 				highPassStrength = cfg.getFloat("highPassStrength");
 
 				cfg.end();
@@ -122,7 +124,7 @@ namespace ThisSketch {
 			return result;
 		}
 		Img multiscaleApply(Img src, function<Img(Img)> func) {
-			std::vector<Img> origScales = ThisSketch::buildGaussianPyramid(src);
+			std::vector<Img> origScales = options.pyramidOld ? ThisSketch::buildGaussianPyramid_old(src) : ThisSketch::buildGaussianPyramid(src);
 			std::vector<Img> updatedScales(origScales.size());
 			static const auto filter = ci::FilterGaussian();
 			const int last = origScales.size() - 1;
