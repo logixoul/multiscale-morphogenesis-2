@@ -89,8 +89,8 @@ namespace ThisSketch {
 		const float sigmaX = sigma;
 		const float sigmaY = sigma;
 
-		const int radiusX = 2;
-		const int radiusY = 2;
+		const int radiusX = 4;
+		const int radiusY = 4;
 
 		ci::FilterGaussian filter;
 
@@ -98,50 +98,114 @@ namespace ThisSketch {
 		Array2D<float> out(dstSize.x, dstSize.y);
 
 		// Horizontal pass: src -> tmp
-		for (int y = 0; y < src.h; ++y) {
-			for (int x = 0; x < dstSize.x; ++x) {
-				const float srcX = (x + 0.5f) * scaleX - 0.5f;
+		for (int dstY = 0; dstY < src.h; ++dstY) {
+			for (int dstX = 0; dstX < dstSize.x; ++dstX) {
+				const float srcX = (dstX + 0.5f) * scaleX - 0.5f;
+				const float cen = (dstX + .5f) * scaleX;
 
 				float sum = 0.0f;
 				float wsum = 0.0f;
-				for (int k = -radiusX; k <= radiusX; ++k) {
-					//const int ix = clampi(int(std::floor(srcX + k + 0.5f)), 0, src.w - 1);
+				for (int i = -radiusX; i <= radiusX; ++i) {
 					bool outOfBounds;
-					const int ix = clampi(int(std::floor(srcX + k + 0.5f)), 0, src.w - 1, &outOfBounds);
-					const float d = (ix - srcX) / sigmaX;
-					const float w = std::exp(-0.5f * d * d);
+					const int ix = clampi(int(srcX + i + 0.5f), 0, src.w - 1, &outOfBounds);
+					float d = (ix + 0.5f - cen);
+					//const float d = (ix - srcX) / sigmaX;
+					const float w = std::exp(-2.0f * d * d);
 					if (!outOfBounds) {
-						sum += w * src.data[y * src.w + ix];
+						sum += w * src.data[dstY * src.w + ix];
 						wsum += w;
 					}
 				}
-				tmp.data[y * tmp.w + x] = sum / wsum;
+				tmp.data[dstY * tmp.w + dstX] = sum / wsum;
 			}
 		}
 
 		// Vertical pass: tmp -> out
-		for (int y = 0; y < dstSize.y; ++y) {
-			const float srcY = (y + 0.5f) * scaleY - 0.5f;
+		for (int dstY = 0; dstY < dstSize.y; ++dstY) {
+			const float srcY = (dstY + 0.5f) * scaleY - 0.5f;
+			const float cen = (dstY + .5f) * scaleY;
 
-			for (int x = 0; x < dstSize.x; ++x) {
+			for (int dstX = 0; dstX < dstSize.x; ++dstX) {
 				float sum = 0.0f;
 				float wsum = 0.0f;
-				for (int k = -radiusY; k <= radiusY; ++k) {
+				for (int i = -radiusY; i <= radiusY; ++i) {
 					bool outOfBounds;
-					const int iy = clampi(int(std::floor(srcY + k + 0.5f)), 0, src.h - 1, &outOfBounds);
-					const float d = (iy - srcY) / sigmaY;
-					const float w = std::exp(-0.5f * d * d);
+					const int iy = clampi(int(srcY + i + 0.5f), 0, src.h - 1, &outOfBounds);
+					float d = (iy + 0.5f - cen);
+					//const float d = (iy - srcY) / sigmaY;
+					const float w = std::exp(-2.0f * d * d);
 					if (!outOfBounds) {
-						sum += w * tmp.data[iy * tmp.w + x];
+						sum += w * tmp.data[iy * tmp.w + dstX];
 						wsum += w;
 					}
 				}
-				out.data[y * out.w + x] = sum / wsum;
+				out.data[dstY * out.w + dstX] = sum / wsum;
 			}
 		}
 
 		return out;
 	}
+
+	Array2D<float> resizeGaussianCpuSimple2Trimmed(Array2D<float> src, ivec2 dstSize, float sigma)
+	{
+		(void)sigma;
+
+		const int srcW = src.w;
+		const int srcH = src.h;
+		const int dstW = dstSize.x;
+		const int dstH = dstSize.y;
+
+		const float sx = dstW / (float)srcW;
+		const float sy = dstH / (float)srcH;
+		
+		const float support = 1.25f;
+
+		Array2D<float> tmp(dstW, srcH);
+		Array2D<float> out(dstW, dstH);
+
+		for (int dstY = 0; dstY < srcH; ++dstY) {
+			for (int dstX = 0; dstX < dstW; ++dstX) {
+				const float cen = (dstX + .5f) / sx;
+				int start = (int)(cen - support + 0.5f);
+				int end = (int)(cen + support + 0.5f);
+
+				float sum = 0.0f;
+				float wsum = 0.0f;
+				for (int i = start; i < end; ++i) {
+					if (i < 0 || i >= srcW) continue;
+					float d = i + 0.5f - cen;
+					float w = exp(-2.0f * d * d);
+					sum += w * src.data[dstY * srcW + i];
+					wsum += w;
+				}
+
+				tmp.data[dstY * dstW + dstX] = sum / wsum;
+			}
+		}
+
+		for (int dstY = 0; dstY < dstH; ++dstY) {
+			const float cen = (dstY + .5f) / sy;
+			int start = (int)(cen - support + 0.5f);
+			int end = (int)(cen + support + 0.5f);
+
+			for (int dstX = 0; dstX < dstW; ++dstX) {
+				float sum = 0.0f;
+				float wsum = 0.0f;
+				for (int i = start; i < end; ++i) {
+					if (i < 0 || i >= srcH) continue;
+					float d = i + 0.5f - cen;
+					float w = exp(-2.0f * d * d);
+					sum += w * tmp.data[i * dstW + dstX];
+					wsum += w;
+				}
+
+				out.data[dstY * dstW + dstX] = sum / wsum;
+			}
+		}
+
+		return out;
+	}
+
 
 	Array2D<float> resizeGaussianCpuSimple2(Array2D<float> src, ivec2 dstSize, float sigma)
 	{
@@ -154,7 +218,7 @@ namespace ThisSketch {
 
 		const float sx = dstW / (float)srcW;
 		const float sy = dstH / (float)srcH;
-		
+
 		ci::FilterGaussian filter;
 
 		const float filterScaleX = std::max(1.0f, 1.0f / sx);
@@ -242,65 +306,7 @@ namespace ThisSketch {
 		return out;
 	}
 
-	Array2D<float> resizeGaussianCpuSimple2Trimmed(Array2D<float> src, ivec2 dstSize, float sigma)
-	{
-		(void)sigma;
 
-		const int srcW = src.w;
-		const int srcH = src.h;
-		const int dstW = dstSize.x;
-		const int dstH = dstSize.y;
-
-		const float sx = dstW / (float)srcW;
-		const float sy = dstH / (float)srcH;
-		
-		const float support = 1.25f;
-
-		Array2D<float> tmp(dstW, srcH);
-		Array2D<float> out(dstW, dstH);
-
-		for (int dstY = 0; dstY < srcH; ++dstY) {
-			for (int dstX = 0; dstX < dstW; ++dstX) {
-				const float cen = (dstX + .5f) / sx;
-				int start = (int)(cen - support + 0.5f);
-				int end = (int)(cen + support + 0.5f);
-
-				float sum = 0.0f;
-				float wsum = 0.0f;
-				for (int i = start; i < end; ++i) {
-					if (i < 0 || i >= srcW) continue;
-					float d = i + 0.5f - cen;
-					float w = exp(-2.0f * d * d);
-					sum += w * src.data[dstY * srcW + i];
-					wsum += w;
-				}
-
-				tmp.data[dstY * dstW + dstX] = sum / wsum;
-			}
-		}
-
-		for (int dstY = 0; dstY < dstH; ++dstY) {
-			const float cen = (dstY + .5f) / sy;
-			int start = (int)(cen - support + 0.5f);
-			int end = (int)(cen + support + 0.5f);
-
-			for (int dstX = 0; dstX < dstW; ++dstX) {
-				float sum = 0.0f;
-				float wsum = 0.0f;
-				for (int i = start; i < end; ++i) {
-					if (i < 0 || i >= srcH) continue;
-					float d = i + 0.5f - cen;
-					float w = exp(-2.0f * d * d);
-					sum += w * tmp.data[i * dstW + dstX];
-					wsum += w;
-				}
-
-				out.data[dstY * dstW + dstX] = sum / wsum;
-			}
-		}
-
-		return out;
-	}
 
 	gl::TextureRef redToLuminance(gl::TextureRef const& in) {
 		return shade2(in,
