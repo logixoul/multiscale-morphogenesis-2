@@ -92,7 +92,7 @@ namespace ThisSketch {
 		return scales;
 	}
 
-	Array2D<float> resizeGaussianCpuSimple(Array2D<float> src, ivec2 dstSize)
+	Array2D<float> resizeGaussianCpuSimple(Array2D<float> const& src, ivec2 dstSize)
 	{
 		auto clampi = [](int v, int lo, int hi, bool* outOfBounds) {
 			*outOfBounds = (v < lo) || (v > hi);
@@ -157,7 +157,7 @@ namespace ThisSketch {
 		return out;
 	}
 
-	Array2D<float> resizeGaussianCpuSimple2Trimmed(Array2D<float> src, ivec2 dstSize)
+	Array2D<float> resizeGaussianCpuSimple2Trimmed(Array2D<float> const& src, ivec2 dstSize)
 	{
 		const int srcW = src.w;
 		const int srcH = src.h;
@@ -194,24 +194,15 @@ namespace ThisSketch {
 				float sum = 0.0f;
 				float wsum = 0.0f;
 				for (int i = start; i < end; ++i) {
-					float d = i + 0.5f - cen;
-					float w = sc * exp(-2.0f * d * d / filterScaleX);
-					sum += w * src(i, dstY);
+					float w = sc * filter((i + 0.5f - cen) / filterScaleX);
+					sum += w * src.data[dstY * srcW + i];
 					wsum += w;
 				}
 
-				if (wsum == 0.0f) {
-					int mid = (start + end) >> 1;
-					if (mid < 0) mid = 0;
-					if (mid >= srcW) mid = srcW - 1;
-					tmp(dstX, dstY) = src(mid, dstY);
-				}
-				else {
-					int ic = (int)(cen + 0.5f);
-					if (ic < start) ic = start;
-					else if (ic >= end) ic = end - 1;
-					tmp(dstX, dstY) = sum + (1.0f - wsum) * src(ic, dstY);
-				}
+				int ic = (int)(cen + 0.5f);
+				if (ic < start) ic = start;
+				else if (ic >= end) ic = end - 1;
+				tmp.data[dstY * dstW + dstX] = sum + (1.0f - wsum) * src.data[dstY * srcW + ic];
 			}
 		}
 
@@ -237,18 +228,10 @@ namespace ThisSketch {
 					wsum += w;
 				}
 
-				if (wsum == 0.0f) {
-					int mid = (start + end) >> 1;
-					if (mid < 0) mid = 0;
-					if (mid >= srcH) mid = srcH - 1;
-					out.data[dstY * dstW + dstX] = tmp.data[mid * dstW + dstX];
-				}
-				else {
-					int ic = (int)(cen + 0.5f);
-					if (ic < start) ic = start;
-					else if (ic >= end) ic = end - 1;
-					out.data[dstY * dstW + dstX] = sum + (1.0f - wsum) * tmp.data[ic * dstW + dstX];
-				}
+				int ic = (int)(cen + 0.5f);
+				if (ic < start) ic = start;
+				else if (ic >= end) ic = end - 1;
+				out.data[dstY * dstW + dstX] = sum + (1.0f - wsum) * tmp.data[ic * dstW + dstX];
 			}
 		}
 
@@ -256,7 +239,7 @@ namespace ThisSketch {
 	}
 
 
-	Array2D<float> resizeGaussianCpuSimple2(Array2D<float> src, ivec2 dstSize)
+	Array2D<float> resizeGaussianCpuSimple2(Array2D<float> const& src, ivec2 dstSize)
 	{
 		const int srcW = src.w;
 		const int srcH = src.h;

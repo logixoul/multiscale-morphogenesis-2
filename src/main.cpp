@@ -144,7 +144,7 @@ namespace ThisSketch {
 			for (int i = updatedScales.size() - 1; i >= 1; i--) {
 				auto diff = subtract(updatedScales[i], origScales[i]);
 				diff = multiply(diff, weights[i]);
-				auto oldVer = ThisSketch::resize(diff, origScales[i - 1].Size(), filter);
+				auto oldVer = ThisSketch::resizeGaussianCpuSimple2Trimmed(diff, origScales[i - 1].Size());
 				//auto newVer = ThisSketch::resizeGaussianCpuSimple(diff, origScales[i - 1].Size(), options.upscaleSigma);
 				//auto newVer = gpuBlurClaude::singleblurLikeCinder(diff, origScales[i - 1].Size());
 				//auto upscaledDiff = options.pyramidOld ? oldVer : newVer;
@@ -168,6 +168,30 @@ namespace ThisSketch {
 			if(!isPaused)
 				img = newImg;
 			img = to01(img);
+
+			testMatchingFunctionality();
+		}
+
+		void testMatchingFunctionality() {
+			Array2D<float> arr(100, 100);
+			forxy(arr) {
+				arr(p) = ::randFloat();
+			}
+
+			vector<int> testSizes{ 50, 200, 67, 107, 3 };
+			for (int testSize : testSizes) {
+				auto newImpl = ThisSketch::resizeGaussianCpuSimple2Trimmed(arr, ivec2(testSize, testSize));
+				//auto newImpl = ThisSketch::resizeGaussianCpuSimple2(arr, ivec2(testSize, testSize)); // works
+				auto oldImpl = ThisSketch::resize(arr, ivec2(testSize, testSize), ci::FilterGaussian());
+				//mm("new", newImpl);
+				//mm("old", oldImpl);
+				
+				forxy(newImpl) {
+					if (abs(newImpl(p) - oldImpl(p)) > 0.0001) {
+						std::cout << "[" << testSize << "] mismatch at " << p.x << ", " << p.y << ": " << newImpl(p) << " vs " << oldImpl(p) << std::endl;
+					}
+				}
+			}
 		}
 
 		static gl::TextureRef gpuHighpass(gl::TextureRef in, float strength) {
