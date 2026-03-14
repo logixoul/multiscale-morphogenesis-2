@@ -150,32 +150,30 @@ namespace ThisSketch {
 	{
 		(void)sigma;
 
-		const int srcW = src.w;
-		const int srcH = src.h;
 		const int dstW = dstSize.x;
 		const int dstH = dstSize.y;
 
-		const float sx = dstW / (float)srcW;
-		const float sy = dstH / (float)srcH;
+		const float scaleX = dstW / (float)src.w;
+		const float scaleY = dstH / (float)src.h;
 		
 		const float support = 1.25f;
 
-		Array2D<float> tmp(dstW, srcH);
+		Array2D<float> tmp(dstW, src.h);
 		Array2D<float> out(dstW, dstH);
 
-		for (int dstY = 0; dstY < srcH; ++dstY) {
+		for (int dstY = 0; dstY < src.h; ++dstY) {
 			for (int dstX = 0; dstX < dstW; ++dstX) {
-				const float cen = (dstX + .5f) / sx;
+				const float cen = (dstX + .5f) / scaleX;
 				int start = (int)(cen - support + 0.5f);
 				int end = (int)(cen + support + 0.5f);
 
 				float sum = 0.0f;
 				float wsum = 0.0f;
 				for (int i = start; i < end; ++i) {
-					if (i < 0 || i >= srcW) continue;
+					if (i < 0 || i >= src.w) continue;
 					float d = i + 0.5f - cen;
 					float w = exp(-2.0f * d * d);
-					sum += w * src.data[dstY * srcW + i];
+					sum += w * src.data[dstY * src.w + i];
 					wsum += w;
 				}
 
@@ -184,7 +182,7 @@ namespace ThisSketch {
 		}
 
 		for (int dstY = 0; dstY < dstH; ++dstY) {
-			const float cen = (dstY + .5f) / sy;
+			const float cen = (dstY + .5f) / scaleY;
 			int start = (int)(cen - support + 0.5f);
 			int end = (int)(cen + support + 0.5f);
 
@@ -192,7 +190,7 @@ namespace ThisSketch {
 				float sum = 0.0f;
 				float wsum = 0.0f;
 				for (int i = start; i < end; ++i) {
-					if (i < 0 || i >= srcH) continue;
+					if (i < 0 || i >= src.h) continue;
 					float d = i + 0.5f - cen;
 					float w = exp(-2.0f * d * d);
 					sum += w * tmp.data[i * dstW + dstX];
