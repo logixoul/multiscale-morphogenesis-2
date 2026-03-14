@@ -242,8 +242,8 @@ namespace ThisSketch {
 			dbgImg(6, 6) = 1.0f;
 			dbgImg(6, 7) = 1.0f;
 			//auto dbgImg = img.clone();
-			static const auto filter = ci::FilterGaussian();
-			auto texOld = gtex(ThisSketch::resizeGaussianCpuSimple(dbgImg, dbgImg.Size()*2, options.upscaleSigma));
+			auto texOld = gpuBlurClaude::singleblurLikeCinder(gtex(dbgImg), dbgImg.Size() * 2, options.upscaleSigma);
+			//auto texOld = gtex(ThisSketch::resizeGaussianCpuSimple(dbgImg, dbgImg.Size()*2, options.upscaleSigma));
 			auto texNew = gtex(ThisSketch::resizeGaussianCpuSimple2Trimmed(dbgImg, dbgImg.Size() * 2, options.upscaleSigma));
 
 			auto tex = shade2(texOld, texNew, MULTILINE(

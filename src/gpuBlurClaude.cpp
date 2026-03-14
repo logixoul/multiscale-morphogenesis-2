@@ -20,21 +20,40 @@ namespace gpuBlurClaude {
 		float hscale = float(dstSize.x) / src->getWidth();
 		float vscale = float(dstSize.y) / src->getHeight();
 		
-		string shader =
-			"int x = int(gl_FragCoord.x);"
-			"int y = int(gl_FragCoord.y);"
-			"float srcX = (x + 0.5f) * scaleX - 0.5f;"
-			"float srcY = (y + 0.5f) * scaleY - 0.5f;"
-			"float srcPos = (isHorizontal != 0) ? srcX : srcY;"
-			"int srcLen = (isHorizontal != 0) ? int(texSize.x) : int(texSize.y);"
+		string shaderH =
+			"int dstX = int(gl_FragCoord.x);"
+			"int dstY = int(gl_FragCoord.y);"
+			"float srcX = (dstX + 0.5f) / scaleX;"
+			"float srcY = (dstY + 0.5f) / scaleY;"
 			"float sum = 0.0;"
 			"float wsum = 0.0;"
-			"for (int k = -2; k <= 2; ++k) {"
-			"    int i = int(floor(srcPos + float(k) + 0.5));"
-			"    if (i < 0 || i >= srcLen) continue;"
-			"    float d = (float(i) - srcPos) / sigma;"
-			"    float w = exp(-0.5 * d * d);"
-			"    ivec2 p = (isHorizontal != 0) ? ivec2(i, y) : ivec2(x, i);"
+			"float cen = (dstX + .5f) / scaleX;"
+			"for (int k = -3; k <= 3; ++k) {"
+			"    int i = int(floor(srcX + float(k)));"
+			"    if (i < 0 || i >= int(texSize.x)) continue;"
+			"	 float d = float(i) + 0.5f - cen;"
+			"	 float w = exp(-2.0f * d * d);"
+			"    ivec2 p = ivec2(i, dstY);"
+			"    sum += w * texelFetch(tex, p, 0).r;"
+			"    wsum += w;"
+			"}"
+			"_out.r = sum / wsum;"
+			;
+
+		string shaderV =
+			"int dstX = int(gl_FragCoord.x);"
+			"int dstY = int(gl_FragCoord.y);"
+			"float srcX = (dstX + 0.5f) / scaleX;"
+			"float srcY = (dstY + 0.5f) / scaleY;"
+			"float sum = 0.0;"
+			"float wsum = 0.0;"
+			"float cen = (dstY + .5f) / scaleY;"
+			"for (int k = -3; k <= 3; ++k) {"
+			"    int i = int(floor(srcY + float(k)));"
+			"    if (i < 0 || i >= int(texSize.y)) continue;"
+			"	 float d = float(i) + 0.5f - cen;"
+			"	 float w = exp(-2.0f * d * d);"
+			"    ivec2 p = ivec2(dstX, i);"
 			"    sum += w * texelFetch(tex, p, 0).r;"
 			"    wsum += w;"
 			"}"
@@ -46,11 +65,11 @@ namespace gpuBlurClaude {
 			setTextureBorderColor(src, 0, 0, 0, 0);
 		}
 		//setWrapBlack(src);
-		auto hscaled = shade2(src, shader,
+		auto hscaled = shade2(src, shaderH,
 			ShadeOpts()
 			.dstRectSize(ivec2(dstSize.x, src->getHeight()))
 			.scale(hscale, 1.0f)
-			.uniform("scaleX", 1.0f / hscale)
+			.uniform("scaleX", hscale)
 			.uniform("scaleY", 1.0f)
 			.uniform("isHorizontal", 1)
 			.uniform("sigma", gaussW)
@@ -59,11 +78,11 @@ namespace gpuBlurClaude {
 		if (wrap == GL_CLAMP_TO_BORDER) {
 			setTextureBorderColor(hscaled, 0, 0, 0, 0);
 		}
-		auto vscaled = shade2(hscaled, shader,
+		auto vscaled = shade2(hscaled, shaderV,
 			ShadeOpts()
 			.dstRectSize(dstSize)
 			.uniform("scaleX", 1.0f)
-			.uniform("scaleY", 1.0f / vscale)
+			.uniform("scaleY", vscale)
 			.uniform("isHorizontal", 0)
 			.uniform("sigma", gaussW));
 		return vscaled;
