@@ -27,6 +27,7 @@ namespace ThisSketch {
 			float highPassStrength;
 			float downscaleSigma;
 			float upscaleSigma;
+			float dbgScaleFactor;
 			cfg2 cfg;
 
 			void update() {
@@ -41,6 +42,7 @@ namespace ThisSketch {
 				highPassStrength = cfg.getFloat("highPassStrength");
 				downscaleSigma = cfg.getFloat("downscaleSigma");
 				upscaleSigma = cfg.getFloat("upscaleSigma");
+				dbgScaleFactor = cfg.getFloat("dbgScaleFactor");
 
 				cfg.end();
 			}
@@ -242,9 +244,10 @@ namespace ThisSketch {
 			dbgImg(6, 6) = 1.0f;
 			dbgImg(6, 7) = 1.0f;
 			//auto dbgImg = img.clone();
-			auto texOld = gpuBlurClaude::singleblurLikeCinder(gtex(dbgImg), dbgImg.Size() * 2, options.upscaleSigma);
+			ivec2 const dstSize = ivec2(vec2(dbgImg.Size()) * options.dbgScaleFactor);
+			auto texOld = gpuBlurClaude::singleblurLikeCinder(gtex(dbgImg), dstSize, options.upscaleSigma);
 			//auto texOld = gtex(ThisSketch::resizeGaussianCpuSimple(dbgImg, dbgImg.Size()*2, options.upscaleSigma));
-			auto texNew = gtex(ThisSketch::resizeGaussianCpuSimple2Trimmed(dbgImg, dbgImg.Size() * 2, options.upscaleSigma));
+			auto texNew = gtex(ThisSketch::resizeGaussianCpuSimple2Trimmed(dbgImg, dstSize, options.upscaleSigma));
 
 			auto tex = shade2(texOld, texNew, MULTILINE(
 				float fOld = fetch1();

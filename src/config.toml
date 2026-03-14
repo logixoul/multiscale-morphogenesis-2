@@ -14,6 +14,14 @@ max = 20.0
 speed = 0.02
 logarithmic = true
 
+[param.dbgScaleFactor]
+type = "float"
+default = 2.0
+min = 0.0068
+max = 20.0
+speed = 0.02
+logarithmic = false
+
 [param.downscaleSigma]
 type = "float"
 default = 1.0

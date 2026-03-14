@@ -157,6 +157,10 @@ namespace ThisSketch {
 		const float scaleY = dstH / (float)src.h;
 		
 		const float support = 1.25f;
+		const float filterScaleX = std::max(1.0f, 1.0f / scaleX);
+		const float filterScaleY = std::max(1.0f, 1.0f / scaleY);
+		const float supportX = std::max(0.5f, filterScaleX * support);
+		const float supportY = std::max(0.5f, filterScaleY * support);
 
 		Array2D<float> tmp(dstW, src.h);
 		Array2D<float> out(dstW, dstH);
@@ -164,8 +168,8 @@ namespace ThisSketch {
 		for (int dstY = 0; dstY < src.h; ++dstY) {
 			for (int dstX = 0; dstX < dstW; ++dstX) {
 				const float cen = (dstX + .5f) / scaleX;
-				int start = (int)(cen - support + 0.5f);
-				int end = (int)(cen + support + 0.5f);
+				int start = (int)(cen - supportX + 0.5f);
+				int end = (int)(cen + supportX + 0.5f);
 
 				float sum = 0.0f;
 				float wsum = 0.0f;
@@ -183,8 +187,8 @@ namespace ThisSketch {
 
 		for (int dstY = 0; dstY < dstH; ++dstY) {
 			const float cen = (dstY + .5f) / scaleY;
-			int start = (int)(cen - support + 0.5f);
-			int end = (int)(cen + support + 0.5f);
+			int start = (int)(cen - supportY + 0.5f);
+			int end = (int)(cen + supportY + 0.5f);
 
 			for (int dstX = 0; dstX < dstW; ++dstX) {
 				float sum = 0.0f;
