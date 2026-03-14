@@ -87,7 +87,7 @@ namespace ThisSketch {
 				break;
 			scales.push_back(state);
 			ivec2 newSize = ivec2(vec2(state.Size()) * scalePerLevel);
-			state = ThisSketch::resizeGaussianCpuSimple2Trimmed(state, newSize);
+			state = gpuBlurClaude::singleblurLikeCinder(state, newSize);
 		}
 		return scales;
 	}
