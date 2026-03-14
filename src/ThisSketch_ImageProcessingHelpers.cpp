@@ -256,10 +256,8 @@ namespace ThisSketch {
 
 		ci::FilterGaussian filter;
 
-		const float filterScaleX = std::max(1.0f, 1.0f / sx);
-		const float filterScaleY = std::max(1.0f, 1.0f / sy);
-		const float supportX = std::max(0.5f, filterScaleX * filter.getSupport());
-		const float supportY = std::max(0.5f, filterScaleY * filter.getSupport());
+		const float supportX = std::max(0.5f, filter.getSupport());
+		const float supportY = std::max(0.5f, filter.getSupport());
 
 		Array2D<float> tmp(dstW, srcH);
 		Array2D<float> out(dstW, dstH);
@@ -274,14 +272,14 @@ namespace ThisSketch {
 
 				float den = 0.0f;
 				for (int i = start; i < end; ++i) {
-					den += filter((i + 0.5f - cen) / filterScaleX);
+					den += filter((i + 0.5f - cen));
 				}
 
 				const float sc = (den == 0.0f) ? 1.0f : (1.0f / den);
 				float sum = 0.0f;
 				float wsum = 0.0f;
 				for (int i = start; i < end; ++i) {
-					float w = sc * filter((i + 0.5f - cen) / filterScaleX);
+					float w = sc * filter((i + 0.5f - cen));
 					sum += w * src.data[y * srcW + i];
 					wsum += w;
 				}
@@ -302,7 +300,7 @@ namespace ThisSketch {
 
 			float den = 0.0f;
 			for (int i = start; i < end; ++i) {
-				den += filter((i + 0.5f - cen) / filterScaleY);
+				den += filter((i + 0.5f - cen));
 			}
 
 			const float sc = (den == 0.0f) ? 1.0f : (1.0f / den);
@@ -310,7 +308,7 @@ namespace ThisSketch {
 				float sum = 0.0f;
 				float wsum = 0.0f;
 				for (int i = start; i < end; ++i) {
-					float w = sc * filter((i + 0.5f - cen) / filterScaleY);
+					float w = sc * filter((i + 0.5f - cen));
 					sum += w * tmp.data[i * dstW + x];
 					wsum += w;
 				}
