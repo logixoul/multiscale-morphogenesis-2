@@ -194,7 +194,8 @@ namespace ThisSketch {
 				float sum = 0.0f;
 				float wsum = 0.0f;
 				for (int i = start; i < end; ++i) {
-					float w = sc * filter((i + 0.5f - cen) / filterScaleX);
+					float d = (i + 0.5f - cen) / filterScaleX;
+					float w = sc * filter(d);
 					sum += w * src.data[dstY * srcW + i];
 					wsum += w;
 				}
@@ -223,7 +224,8 @@ namespace ThisSketch {
 				float sum = 0.0f;
 				float wsum = 0.0f;
 				for (int i = start; i < end; ++i) {
-					float w = sc * filter((i + 0.5f - cen) / filterScaleY);
+					float d = (i + 0.5f - cen) / filterScaleY;
+					float w = sc * filter(d);
 					sum += w * tmp.data[i * dstW + dstX];
 					wsum += w;
 				}
