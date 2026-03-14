@@ -247,7 +247,7 @@ namespace ThisSketch {
 			ivec2 const dstSize = ivec2(vec2(dbgImg.Size()) * options.dbgScaleFactor);
 			auto texOld = gpuBlurClaude::singleblurLikeCinder(gtex(dbgImg), dstSize, options.upscaleSigma);
 			//auto texOld = gtex(ThisSketch::resizeGaussianCpuSimple(dbgImg, dbgImg.Size()*2, options.upscaleSigma));
-			auto texNew = gtex(ThisSketch::resizeGaussianCpuSimple2Trimmed(dbgImg, dstSize, options.upscaleSigma));
+			auto texNew = gtex(ThisSketch::resizeGaussianCpuSimple2(dbgImg, dstSize, options.upscaleSigma));
 
 			auto tex = shade2(texOld, texNew, MULTILINE(
 				float fOld = fetch1();
