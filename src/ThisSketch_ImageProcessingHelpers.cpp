@@ -66,47 +66,7 @@ namespace ThisSketch {
 		return resultArray;
 	}
 
-	Array2D<float> resizeViaGpu(Array2D<float> src, ivec2 dstSize)
-	{
-		auto tex = gtex(src);
-		auto resizedTex = shade2(tex,
-			"_out.r = fetch1();",
-			ShadeOpts().dstRectSize(dstSize));
-		return dl<float>(resizedTex);
-	}
-
-	std::vector<Img> buildGaussianPyramid_old(Img src, float scalePerLevel) {
-		std::vector<Img> scales;
-		auto state = src.clone();
-		static const auto filter = ci::FilterGaussian();
-		while (true)
-		{
-			const int size = std::min(state.w, state.h);
-			if (size <= 2)
-				break;
-			scales.push_back(state);
-			ivec2 newSize = ivec2(vec2(state.Size()) * scalePerLevel);
-			state = ThisSketch::resize(state, newSize, filter);
-		}
-		return scales;
-	}
-
 	std::vector<Img> buildGaussianPyramid(Img src, float scalePerLevel, float downscaleSigma) {
-		std::vector<Img> scales;
-		auto state = src.clone();
-		while (true)
-		{
-			const int size = std::min(state.w, state.h);
-			if (size <= 2)
-				break;
-			scales.push_back(state);
-			ivec2 newSize = ivec2(vec2(state.Size()) * scalePerLevel);
-			state = ThisSketch::resizeGaussianCpuSimple(state, newSize, downscaleSigma);
-		}
-		return scales;
-	}
-
-	std::vector<Img> buildGaussianPyramidGpu(Img src, float scalePerLevel, float downscaleSigma) {
 		auto tex = gtex(src);
 		std::vector<gl::TextureRef> scales = gpuBlurClaude::buildGaussianPyramid(tex, scalePerLevel, downscaleSigma);
 		std::vector<Img> result;
@@ -175,6 +135,190 @@ namespace ThisSketch {
 					}
 				}
 				out.data[y * out.w + x] = sum / wsum;
+			}
+		}
+
+		return out;
+	}
+
+	Array2D<float> resizeGaussianCpuSimple2(Array2D<float> src, ivec2 dstSize, float sigma)
+	{
+		(void)sigma;
+
+		const int srcW = src.w;
+		const int srcH = src.h;
+		const int dstW = dstSize.x;
+		const int dstH = dstSize.y;
+
+		const float sx = dstW / (float)srcW;
+		const float sy = dstH / (float)srcH;
+		const float mapOffset = 0.5f;
+
+		ci::FilterGaussian filter;
+
+		const float filterScaleX = std::max(1.0f, 1.0f / sx);
+		const float filterScaleY = std::max(1.0f, 1.0f / sy);
+		const float supportX = std::max(0.5f, filterScaleX * filter.getSupport());
+		const float supportY = std::max(0.5f, filterScaleY * filter.getSupport());
+
+		Array2D<float> tmp(dstW, srcH);
+		Array2D<float> out(dstW, dstH);
+
+		for (int y = 0; y < srcH; ++y) {
+			for (int x = 0; x < dstW; ++x) {
+				const float cen = (x + mapOffset) / sx;
+				int start = (int)(cen - supportX + 0.5f);
+				int end = (int)(cen + supportX + 0.5f);
+				if (start < 0) start = 0;
+				if (end > srcW) end = srcW;
+
+				float den = 0.0f;
+				for (int i = start; i < end; ++i) {
+					den += filter((i + 0.5f - cen) / filterScaleX);
+				}
+
+				const float sc = (den == 0.0f) ? 1.0f : (1.0f / den);
+				float sum = 0.0f;
+				float wsum = 0.0f;
+				for (int i = start; i < end; ++i) {
+					float w = sc * filter((i + 0.5f - cen) / filterScaleX);
+					sum += w * src.data[y * srcW + i];
+					wsum += w;
+				}
+
+				if (wsum == 0.0f) {
+					int mid = (start + end) >> 1;
+					if (mid < 0) mid = 0;
+					if (mid >= srcW) mid = srcW - 1;
+					tmp.data[y * dstW + x] = src.data[y * srcW + mid];
+				}
+				else {
+					int ic = (int)(cen + 0.5f);
+					if (ic < start) ic = start;
+					else if (ic >= end) ic = end - 1;
+					tmp.data[y * dstW + x] = sum + (1.0f - wsum) * src.data[y * srcW + ic];
+				}
+			}
+		}
+
+		for (int y = 0; y < dstH; ++y) {
+			const float cen = (y + mapOffset) / sy;
+			int start = (int)(cen - supportY + 0.5f);
+			int end = (int)(cen + supportY + 0.5f);
+			if (start < 0) start = 0;
+			if (end > srcH) end = srcH;
+
+			float den = 0.0f;
+			for (int i = start; i < end; ++i) {
+				den += filter((i + 0.5f - cen) / filterScaleY);
+			}
+
+			const float sc = (den == 0.0f) ? 1.0f : (1.0f / den);
+			for (int x = 0; x < dstW; ++x) {
+				float sum = 0.0f;
+				float wsum = 0.0f;
+				for (int i = start; i < end; ++i) {
+					float w = sc * filter((i + 0.5f - cen) / filterScaleY);
+					sum += w * tmp.data[i * dstW + x];
+					wsum += w;
+				}
+
+				if (wsum == 0.0f) {
+					int mid = (start + end) >> 1;
+					if (mid < 0) mid = 0;
+					if (mid >= srcH) mid = srcH - 1;
+					out.data[y * dstW + x] = tmp.data[mid * dstW + x];
+				}
+				else {
+					int ic = (int)(cen + 0.5f);
+					if (ic < start) ic = start;
+					else if (ic >= end) ic = end - 1;
+					out.data[y * dstW + x] = sum + (1.0f - wsum) * tmp.data[ic * dstW + x];
+				}
+			}
+		}
+
+		return out;
+	}
+
+	Array2D<float> resizeGaussianCpuSimple2Trimmed(Array2D<float> src, ivec2 dstSize, float sigma)
+	{
+		(void)sigma;
+
+		const int srcW = src.w;
+		const int srcH = src.h;
+		const int dstW = dstSize.x;
+		const int dstH = dstSize.y;
+
+		const float sx = dstW / (float)srcW;
+		const float sy = dstH / (float)srcH;
+		const float mapOffset = 0.5f;
+
+		ci::FilterGaussian filter;
+
+		const float filterScaleX = std::max(1.0f, 1.0f / sx);
+		const float filterScaleY = std::max(1.0f, 1.0f / sy);
+		const float supportX = std::max(0.5f, filterScaleX * filter.getSupport());
+		const float supportY = std::max(0.5f, filterScaleY * filter.getSupport());
+
+		Array2D<float> tmp(dstW, srcH);
+		Array2D<float> out(dstW, dstH);
+
+		for (int y = 0; y < srcH; ++y) {
+			for (int x = 0; x < dstW; ++x) {
+				const float cen = (x + mapOffset) / sx;
+				int start = (int)(cen - supportX + 0.5f);
+				int end = (int)(cen + supportX + 0.5f);
+				if (start < 0) start = 0;
+				if (end > srcW) end = srcW;
+
+				float den = 0.0f;
+				for (int i = start; i < end; ++i) {
+					den += filter((i + 0.5f - cen) / filterScaleX);
+				}
+
+				const float sc = (den == 0.0f) ? 1.0f : (1.0f / den);
+				float sum = 0.0f;
+				float wsum = 0.0f;
+				for (int i = start; i < end; ++i) {
+					float w = sc * filter((i + 0.5f - cen) / filterScaleX);
+					sum += w * src.data[y * srcW + i];
+					wsum += w;
+				}
+
+				int ic = (int)(cen + 0.5f);
+				if (ic < start) ic = start;
+				else if (ic >= end) ic = end - 1;
+				tmp.data[y * dstW + x] = sum + (1.0f - wsum) * src.data[y * srcW + ic];
+			}
+		}
+
+		for (int y = 0; y < dstH; ++y) {
+			const float cen = (y + mapOffset) / sy;
+			int start = (int)(cen - supportY + 0.5f);
+			int end = (int)(cen + supportY + 0.5f);
+			if (start < 0) start = 0;
+			if (end > srcH) end = srcH;
+
+			float den = 0.0f;
+			for (int i = start; i < end; ++i) {
+				den += filter((i + 0.5f - cen) / filterScaleY);
+			}
+
+			const float sc = (den == 0.0f) ? 1.0f : (1.0f / den);
+			for (int x = 0; x < dstW; ++x) {
+				float sum = 0.0f;
+				float wsum = 0.0f;
+				for (int i = start; i < end; ++i) {
+					float w = sc * filter((i + 0.5f - cen) / filterScaleY);
+					sum += w * tmp.data[i * dstW + x];
+					wsum += w;
+				}
+
+				int ic = (int)(cen + 0.5f);
+				if (ic < start) ic = start;
+				else if (ic >= end) ic = end - 1;
+				out.data[y * dstW + x] = sum + (1.0f - wsum) * tmp.data[ic * dstW + x];
 			}
 		}
 

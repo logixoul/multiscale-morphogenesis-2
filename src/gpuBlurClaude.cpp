@@ -11,9 +11,14 @@ namespace gpuBlurClaude {
 		float color[] = { r, g, b, a };
 		glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, color);
 	}
-	static gl::TextureRef singleblurLikeCinder(gl::TextureRef src, float hscale, float vscale, float sigma, GLenum wrap) {
+	Array2D<float> singleblurLikeCinder(Array2D<float> src, ivec2 dstSize, float sigma, GLenum wrap) {
+		return dl<float>(singleblurLikeCinder(gtex(src), dstSize, sigma, wrap));
+	}
+	gl::TextureRef singleblurLikeCinder(gl::TextureRef src, ivec2 dstSize, float sigma, GLenum wrap) {
 		GPU_SCOPE("singleblur");
 		float gaussW = sigma == -1.0f ? 4.0f : sigma;
+		float hscale = float(dstSize.x) / src->getWidth();
+		float vscale = float(dstSize.y) / src->getHeight();
 		
 		string shader =
 			"int x = int(gl_FragCoord.x);"
@@ -43,6 +48,7 @@ namespace gpuBlurClaude {
 		//setWrapBlack(src);
 		auto hscaled = shade2(src, shader,
 			ShadeOpts()
+			.dstRectSize(ivec2(dstSize.x, src->getHeight()))
 			.scale(hscale, 1.0f)
 			.uniform("scaleX", 1.0f / hscale)
 			.uniform("scaleY", 1.0f)
@@ -55,7 +61,7 @@ namespace gpuBlurClaude {
 		}
 		auto vscaled = shade2(hscaled, shader,
 			ShadeOpts()
-			.scale(1.0f, vscale)
+			.dstRectSize(dstSize)
 			.uniform("scaleX", 1.0f)
 			.uniform("scaleY", 1.0f / vscale)
 			.uniform("isHorizontal", 0)
@@ -67,11 +73,13 @@ namespace gpuBlurClaude {
 		std::vector<gl::TextureRef> result;
 		result.push_back(src);
 		auto state = src;
-		int minDim = std::min(src->getWidth(), src->getHeight());
-		while (minDim > 2) {
-			state = singleblurLikeCinder(state, scalePerLevel, scalePerLevel, downscaleSigma, GL_CLAMP_TO_EDGE);
+		while (true) {
+			int minDim = std::min(state->getWidth(), state->getHeight());
+			if(minDim <= 2)
+				break;
+			ivec2 dstSize = ivec2(state->getWidth() * scalePerLevel, state->getHeight() * scalePerLevel);
+			state = singleblurLikeCinder(state, dstSize, downscaleSigma, GL_CLAMP_TO_EDGE);
 			result.push_back(state);
-			minDim *= scalePerLevel;
 		}
 		return result;
 	}
