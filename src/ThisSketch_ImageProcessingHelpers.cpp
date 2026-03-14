@@ -173,7 +173,7 @@ namespace ThisSketch {
 					if (i < 0 || i >= src.w) continue;
 					float d = i + 0.5f - cen;
 					float w = exp(-2.0f * d * d);
-					sum += w * src.data[dstY * src.w + i];
+					sum += w * src(i, dstY);
 					wsum += w;
 				}
 
@@ -193,7 +193,7 @@ namespace ThisSketch {
 					if (i < 0 || i >= src.h) continue;
 					float d = i + 0.5f - cen;
 					float w = exp(-2.0f * d * d);
-					sum += w * tmp.data[i * dstW + dstX];
+					sum += w * tmp(dstX, i);
 					wsum += w;
 				}
 
