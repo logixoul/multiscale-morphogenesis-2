@@ -194,10 +194,9 @@ namespace ThisSketch {
 				float sum = 0.0f;
 				float wsum = 0.0f;
 				for (int i = start; i < end; ++i) {
-					//float w = sc * filter((i + 0.5f - cen) / filterScaleX);
 					float d = i + 0.5f - cen;
 					float w = sc * exp(-2.0f * d * d / filterScaleX);
-					sum += w * src.data[dstY * srcW + i];
+					sum += w * src(i, dstY);
 					wsum += w;
 				}
 
@@ -205,13 +204,13 @@ namespace ThisSketch {
 					int mid = (start + end) >> 1;
 					if (mid < 0) mid = 0;
 					if (mid >= srcW) mid = srcW - 1;
-					tmp.data[dstY * dstW + dstX] = src.data[dstY * srcW + mid];
+					tmp(dstX, dstY) = src(mid, dstY);
 				}
 				else {
 					int ic = (int)(cen + 0.5f);
 					if (ic < start) ic = start;
 					else if (ic >= end) ic = end - 1;
-					tmp.data[dstY * dstW + dstX] = sum + (1.0f - wsum) * src.data[dstY * srcW + ic];
+					tmp(dstX, dstY) = sum + (1.0f - wsum) * src(ic, dstY);
 				}
 			}
 		}
