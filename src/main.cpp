@@ -144,11 +144,11 @@ namespace ThisSketch {
 			for (int i = updatedScales.size() - 1; i >= 1; i--) {
 				auto diff = subtract(updatedScales[i], origScales[i]);
 				diff = multiply(diff, weights[i]);
-				auto oldVer = ThisSketch::resizeGaussianCpuSimple2Trimmed(diff, origScales[i - 1].Size());
+				//auto oldVer = ThisSketch::resizeGaussianCpuSimple2Trimmed(diff, origScales[i - 1].Size());
 				//auto newVer = ThisSketch::resizeGaussianCpuSimple(diff, origScales[i - 1].Size(), options.upscaleSigma);
-				//auto newVer = gpuBlurClaude::singleblurLikeCinder(diff, origScales[i - 1].Size());
+				auto newVer = gpuBlurClaude::singleblurLikeCinder(diff, origScales[i - 1].Size());
 				//auto upscaledDiff = options.pyramidOld ? oldVer : newVer;
-				auto const upscaledDiff = oldVer;
+				auto const upscaledDiff = newVer;
 				/*if (i == updatedScales.size() - 5)
 					dbgTex = gtex(options.pyramidOld ? oldVer : newVer);//op(gtex(oldVer)) - gtex(newVer);*/
 				auto& nextScale = updatedScales[i - 1];
@@ -169,7 +169,7 @@ namespace ThisSketch {
 				img = newImg;
 			img = to01(img);
 
-			testMatchingFunctionality();
+			//testMatchingFunctionality();
 		}
 
 		void testMatchingFunctionality() {
