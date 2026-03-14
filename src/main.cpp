@@ -144,12 +144,13 @@ namespace ThisSketch {
 			for (int i = updatedScales.size() - 1; i >= 1; i--) {
 				auto diff = subtract(updatedScales[i], origScales[i]);
 				diff = multiply(diff, weights[i]);
-				auto oldVer = ThisSketch::resize(diff, origScales[i - 1].Size(), filter);
-				auto newVer = ThisSketch::resizeGaussianCpuSimple(diff, origScales[i - 1].Size(), options.upscaleSigma);
-				//auto newVer = gpuBlurClaude::singleblurLikeCinder(diff, origScales[i - 1].Size(), options.upscaleSigma);
-				auto upscaledDiff = options.pyramidOld ? oldVer : newVer;
-				//if(i == updatedScales.size() - 2)
-				//	dbgTex = options.pyramidOld ? o//op(gtex(oldVer)) - gtex(newVer);
+				//auto oldVer = ThisSketch::resize(diff, origScales[i - 1].Size(), filter);
+				//auto newVer = ThisSketch::resizeGaussianCpuSimple(diff, origScales[i - 1].Size(), options.upscaleSigma);
+				auto newVer = gpuBlurClaude::singleblurLikeCinder(diff, origScales[i - 1].Size(), options.upscaleSigma, GL_CLAMP_TO_EDGE);
+				//auto upscaledDiff = options.pyramidOld ? oldVer : newVer;
+				auto const upscaledDiff = newVer;
+				/*if (i == updatedScales.size() - 5)
+					dbgTex = gtex(options.pyramidOld ? oldVer : newVer);//op(gtex(oldVer)) - gtex(newVer);*/
 				auto& nextScale = updatedScales[i - 1];
 				nextScale = add(origScales[i - 1], upscaledDiff);
 				nextScale = func(nextScale);
@@ -233,21 +234,23 @@ namespace ThisSketch {
 			if (dbgTex) {
 				gl::draw(op(dbgTex) * 100.0f, getWindowBounds());
 			}
-			drawDbg();
+			//drawDbg();
 		}
 //#if 0
 		void drawDbg() {
 			const int lvl = 1;
 
 			Array2D<float> dbgImg(20, 20, 0.0f);
-			dbgImg(5, 5) = 1.0f;
+
+			dbgImg(19, 0) = 0.3f;
 			dbgImg(6, 6) = 1.0f;
 			dbgImg(6, 7) = 1.0f;
+			ci::FilterGaussian filter;
 			//auto dbgImg = img.clone();
 			ivec2 const dstSize = ivec2(vec2(dbgImg.Size()) * options.dbgScaleFactor);
-			auto texOld = gpuBlurClaude::singleblurLikeCinder(gtex(dbgImg), dstSize, options.upscaleSigma);
+			auto texOld = gpuBlurClaude::singleblurLikeCinder(gtex(dbgImg), dstSize, options.upscaleSigma, GL_CLAMP_TO_EDGE);
 			//auto texOld = gtex(ThisSketch::resizeGaussianCpuSimple(dbgImg, dbgImg.Size()*2, options.upscaleSigma));
-			auto texNew = gtex(ThisSketch::resizeGaussianCpuSimple2(dbgImg, dstSize, options.upscaleSigma));
+			auto texNew = gtex(ThisSketch::resize(dbgImg, dstSize, filter));
 
 			auto tex = shade2(texOld, texNew, MULTILINE(
 				float fOld = fetch1();
