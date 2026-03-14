@@ -87,7 +87,7 @@ namespace ThisSketch {
 				break;
 			scales.push_back(state);
 			ivec2 newSize = ivec2(vec2(state.Size()) * scalePerLevel);
-			state = ThisSketch::resize(state, newSize, filter);
+			state = ThisSketch::resizeGaussianCpuSimple2(state, newSize);
 		}
 		return scales;
 	}
@@ -218,10 +218,8 @@ namespace ThisSketch {
 	}
 
 
-	Array2D<float> resizeGaussianCpuSimple2(Array2D<float> src, ivec2 dstSize, float sigma)
+	Array2D<float> resizeGaussianCpuSimple2(Array2D<float> src, ivec2 dstSize)
 	{
-		(void)sigma;
-
 		const int srcW = src.w;
 		const int srcH = src.h;
 		const int dstW = dstSize.x;
