@@ -104,30 +104,16 @@ namespace ThisSketch {
 			state = ThisSketch::resizeGaussianCpuSimple(state, newSize, downscaleSigma);
 		}
 		return scales;
+	}
 
-		/*auto tex = gtex(src);
+	std::vector<Img> buildGaussianPyramidGpu(Img src, float scalePerLevel, float downscaleSigma) {
+		auto tex = gtex(src);
 		std::vector<gl::TextureRef> scales = gpuBlurClaude::buildGaussianPyramid(tex, scalePerLevel, downscaleSigma);
 		std::vector<Img> result;
 		for (auto& scale : scales) {
 			result.push_back(dl<float>(scale));
 		}
-		return result;*/
-	}
-
-	gl::TextureRef redToLuminance(gl::TextureRef const& in) {
-		return shade2(in,
-			"_out.rgb = vec3(fetch1());",
-			ShadeOpts().ifmt(GL_RGBA16F)
-		);
-	}
-
-	float blendHardLight(float base, float blend) {
-		if (blend < 0.5f) {
-			return 2.0f * base * blend;
-		}
-		else {
-			return 1.0f - 2.0f * (1.0f - base) * (1.0f - blend);
-		}
+		return result;
 	}
 
 	Array2D<float> resizeGaussianCpuSimple(Array2D<float> src, ivec2 dstSize, float sigma)
@@ -135,17 +121,16 @@ namespace ThisSketch {
 		auto clampi = [](int v, int lo, int hi, bool* outOfBounds) {
 			*outOfBounds = (v < lo) || (v > hi);
 			return std::max(lo, std::min(v, hi));
-		};
+			};
 
 		const float scaleX = float(src.w) / float(dstSize.x);
 		const float scaleY = float(src.h) / float(dstSize.y);
 
-		// If sigma is not provided, pick a scale-aware default for downsampling.
-		const float sigmaX = (sigma > 0.0f) ? sigma : std::max(0.001f, 0.5f * scaleX);
-		const float sigmaY = (sigma > 0.0f) ? sigma : std::max(0.001f, 0.5f * scaleY);
+		const float sigmaX = sigma;
+		const float sigmaY = sigma;
 
-		const int radiusX = 2;// std::max(1, int(std::ceil(1.0f * sigmaX)));
-		const int radiusY = 2;// std::max(1, int(std::ceil(1.0f * sigmaY)));
+		const int radiusX = 2;
+		const int radiusY = 2;
 
 		Array2D<float> tmp(dstSize.x, src.h);
 		Array2D<float> out(dstSize.x, dstSize.y);
@@ -195,5 +180,23 @@ namespace ThisSketch {
 
 		return out;
 	}
+
+	gl::TextureRef redToLuminance(gl::TextureRef const& in) {
+		return shade2(in,
+			"_out.rgb = vec3(fetch1());",
+			ShadeOpts().ifmt(GL_RGBA16F)
+		);
+	}
+
+	float blendHardLight(float base, float blend) {
+		if (blend < 0.5f) {
+			return 2.0f * base * blend;
+		}
+		else {
+			return 1.0f - 2.0f * (1.0f - base) * (1.0f - blend);
+		}
+	}
+
+	
 
 }

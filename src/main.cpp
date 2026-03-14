@@ -228,13 +228,13 @@ namespace ThisSketch {
 			dbgImg(6, 7) = 100.0f;*/
 			auto dbgImg = img.clone();
 
-			auto texOld = gtex(ThisSketch::buildGaussianPyramid_old(dbgImg)[lvl]);
-			auto texNew = gtex(ThisSketch::buildGaussianPyramid(dbgImg, 0.5f, options.downscaleSigma)[lvl]);
+			auto texOld = gtex(ThisSketch::buildGaussianPyramid(dbgImg)[lvl]);
+			auto texNew = gtex(ThisSketch::buildGaussianPyramidGpu(dbgImg, 0.5f, options.downscaleSigma)[lvl]);
 			auto tex = shade2(texOld, texNew, MULTILINE(
 				float fOld = fetch1();
 				float fNew = fetch1(tex2);
 				float f = abs(fOld - fNew);
-				_out.r = f*100.0;
+				_out.r = f*1.0;
 				)
 			);
 			//tex = options.pyramidOld ? texOld : texNew;

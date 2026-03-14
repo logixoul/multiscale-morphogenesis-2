@@ -143,7 +143,7 @@ namespace gpuBlur2_5 {
 		return vscaled;
 	}
 	// todo: move this to stuff.cpp/h
-	static void setTextureBorderColor(gl::TextureRef tex, float r, float g, float b, float a) {
+	void setTextureBorderColor(gl::TextureRef tex, float r, float g, float b, float a) {
 		bind(tex);
 		float color[] = { r, g, b, a };
 		glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, color);
