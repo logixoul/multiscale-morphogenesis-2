@@ -92,7 +92,7 @@ namespace ThisSketch {
 		return scales;
 	}
 
-	Array2D<float> resizeGaussianCpuSimple(Array2D<float> src, ivec2 dstSize, float sigma)
+	Array2D<float> resizeGaussianCpuSimple(Array2D<float> src, ivec2 dstSize)
 	{
 		auto clampi = [](int v, int lo, int hi, bool* outOfBounds) {
 			*outOfBounds = (v < lo) || (v > hi);
@@ -101,9 +101,6 @@ namespace ThisSketch {
 
 		const float scaleX = float(src.w) / float(dstSize.x);
 		const float scaleY = float(src.h) / float(dstSize.y);
-
-		const float sigmaX = sigma;
-		const float sigmaY = sigma;
 
 		const int radiusX = 4;
 		const int radiusY = 4;
@@ -125,7 +122,6 @@ namespace ThisSketch {
 					bool outOfBounds;
 					const int ix = clampi(int(srcX + i + 0.5f), 0, src.w - 1, &outOfBounds);
 					float d = (ix + 0.5f - cen);
-					//const float d = (ix - srcX) / sigmaX;
 					const float w = std::exp(-2.0f * d * d);
 					if (!outOfBounds) {
 						sum += w * src.data[dstY * src.w + ix];
@@ -148,7 +144,6 @@ namespace ThisSketch {
 					bool outOfBounds;
 					const int iy = clampi(int(srcY + i + 0.5f), 0, src.h - 1, &outOfBounds);
 					float d = (iy + 0.5f - cen);
-					//const float d = (iy - srcY) / sigmaY;
 					const float w = std::exp(-2.0f * d * d);
 					if (!outOfBounds) {
 						sum += w * tmp.data[iy * tmp.w + dstX];
@@ -162,10 +157,8 @@ namespace ThisSketch {
 		return out;
 	}
 
-	Array2D<float> resizeGaussianCpuSimple2Trimmed(Array2D<float> src, ivec2 dstSize, float sigma)
+	Array2D<float> resizeGaussianCpuSimple2Trimmed(Array2D<float> src, ivec2 dstSize)
 	{
-		(void)sigma;
-
 		const int dstW = dstSize.x;
 		const int dstH = dstSize.y;
 
