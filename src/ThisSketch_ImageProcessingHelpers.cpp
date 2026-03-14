@@ -255,7 +255,6 @@ namespace ThisSketch {
 		const float sy = dstH / (float)srcH;
 		
 		const float support = 1.25f;
-		ci::FilterGaussian filter(support);
 
 		Array2D<float> tmp(dstW, srcH);
 		Array2D<float> out(dstW, dstH);
@@ -270,7 +269,8 @@ namespace ThisSketch {
 				float wsum = 0.0f;
 				for (int i = start; i < end; ++i) {
 					if (i < 0 || i >= srcW) continue;
-					float w = filter(i + 0.5f - cen);
+					float d = i + 0.5f - cen;
+					float w = exp(-2.0f * d * d);
 					sum += w * src.data[dstY * srcW + i];
 					wsum += w;
 				}
@@ -289,7 +289,8 @@ namespace ThisSketch {
 				float wsum = 0.0f;
 				for (int i = start; i < end; ++i) {
 					if (i < 0 || i >= srcH) continue;
-					float w = filter(i + 0.5f - cen);
+					float d = i + 0.5f - cen;
+					float w = exp(-2.0f * d * d);
 					sum += w * tmp.data[i * dstW + dstX];
 					wsum += w;
 				}
