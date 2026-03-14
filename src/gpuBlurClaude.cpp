@@ -11,12 +11,11 @@ namespace gpuBlurClaude {
 		float color[] = { r, g, b, a };
 		glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, color);
 	}
-	Array2D<float> singleblurLikeCinder(Array2D<float> src, ivec2 dstSize, float sigma, GLenum wrap) {
-		return dl<float>(singleblurLikeCinder(gtex(src), dstSize, sigma, wrap));
+	Array2D<float> singleblurLikeCinder(Array2D<float> src, ivec2 dstSize) {
+		return dl<float>(singleblurLikeCinder(gtex(src), dstSize));
 	}
-	gl::TextureRef singleblurLikeCinder(gl::TextureRef src, ivec2 dstSize, float sigma, GLenum wrap) {
+	gl::TextureRef singleblurLikeCinder(gl::TextureRef src, ivec2 dstSize) {
 		GPU_SCOPE("singleblur");
-		float gaussW = sigma == -1.0f ? 4.0f : sigma;
 		float hscale = float(dstSize.x) / src->getWidth();
 		float vscale = float(dstSize.y) / src->getHeight();
 		
@@ -34,8 +33,9 @@ namespace gpuBlurClaude {
 			"    if (i < 0 || i >= int(texSize.x)) continue;"
 			"	 float d = (float(i) + 0.5f - cen) / filterScaleX;"
 			"	 float w = exp(-2.0f * d * d);"
-			"    ivec2 p = ivec2(i, dstY);"
-			"    sum += w * texelFetch(tex, p, 0).r;"
+			"    vec2 tcNeighbor = vec2(ivec2(i, dstY));"
+			"	 tcNeighbor = (tcNeighbor + .5) * tsize;"
+			"    sum += w * texture(tex, tcNeighbor).r;"
 			"    wsum += w;"
 			"}"
 			"_out.r = sum / wsum;"
@@ -55,42 +55,29 @@ namespace gpuBlurClaude {
 			"    if (i < 0 || i >= int(texSize.y)) continue;"
 			"	 float d = (float(i) + 0.5f - cen) / filterScaleY;"
 			"	 float w = exp(-2.0f * d * d);"
-			"    ivec2 p = ivec2(dstX, i);"
-			"    sum += w * texelFetch(tex, p, 0).r;"
+			"    vec2 tcNeighbor = vec2(ivec2(dstX, i));"
+			"	 tcNeighbor = (tcNeighbor + .5) * tsize;"
+			"    sum += w * texture(tex, tcNeighbor).r;"
 			"    wsum += w;"
 			"}"
 			"_out.r = sum / wsum;"
 			;
 
-		setWrap(src, wrap);
-		if (wrap == GL_CLAMP_TO_BORDER) {
-			setTextureBorderColor(src, 0, 0, 0, 0);
-		}
-		//setWrapBlack(src);
 		auto hscaled = shade2(src, shaderH,
 			ShadeOpts()
 			.dstRectSize(ivec2(dstSize.x, src->getHeight()))
 			.scale(hscale, 1.0f)
 			.uniform("scaleX", hscale)
-			.uniform("scaleY", 1.0f)
-			.uniform("isHorizontal", 1)
-			.uniform("sigma", gaussW)
 		);
-		setWrap(hscaled, wrap);
-		if (wrap == GL_CLAMP_TO_BORDER) {
-			setTextureBorderColor(hscaled, 0, 0, 0, 0);
-		}
 		auto vscaled = shade2(hscaled, shaderV,
 			ShadeOpts()
 			.dstRectSize(dstSize)
-			.uniform("scaleX", 1.0f)
 			.uniform("scaleY", vscale)
-			.uniform("isHorizontal", 0)
-			.uniform("sigma", gaussW));
+		);
 		return vscaled;
 	}
 
-	std::vector<gl::TextureRef> buildGaussianPyramid(gl::TextureRef const& src, float scalePerLevel, float downscaleSigma) {
+	std::vector<gl::TextureRef> buildGaussianPyramid(gl::TextureRef const& src, float scalePerLevel) {
 		std::vector<gl::TextureRef> result;
 		result.push_back(src);
 		auto state = src;
@@ -99,7 +86,8 @@ namespace gpuBlurClaude {
 			if(minDim <= 2)
 				break;
 			ivec2 dstSize = ivec2(state->getWidth() * scalePerLevel, state->getHeight() * scalePerLevel);
-			state = singleblurLikeCinder(state, dstSize, downscaleSigma, GL_CLAMP_TO_EDGE);
+			//state = singleblurLikeCinder(state, dstSize);
+			state = gpuBlur2_5::singleblur(state, scalePerLevel, scalePerLevel, GL_CLAMP_TO_BORDER);
 			result.push_back(state);
 		}
 		return result;
@@ -107,7 +95,7 @@ namespace gpuBlurClaude {
 
 	gl::TextureRef blurWithInvKernel(gl::TextureRef const& src) {
 		// Build Gaussian pyramid. Each level is half the resolution of the previous.
-		std::vector<gl::TextureRef> levels = buildGaussianPyramid(src, .5f);
+		std::vector<gl::TextureRef> levels = gpuBlur2_5::buildGaussianPyramid(src, .5f);
 		
 		// 1/r kernel in 2D: each octave contributes equal weight,
 		// so each pyramid level gets equal weight.

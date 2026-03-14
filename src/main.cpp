@@ -135,7 +135,7 @@ namespace ThisSketch {
 			return result;
 		}
 		Img multiscaleApply(Img src, function<Img(Img)> func) {
-			std::vector<Img> origScales = ThisSketch::buildGaussianPyramid(src, 0.5f, options.downscaleSigma);
+			std::vector<Img> origScales = ThisSketch::buildGaussianPyramid(src, 0.5f);
 			std::vector<Img> updatedScales(origScales.size());
 			static const auto filter = ci::FilterGaussian();
 			const int last = origScales.size() - 1;
@@ -144,11 +144,11 @@ namespace ThisSketch {
 			for (int i = updatedScales.size() - 1; i >= 1; i--) {
 				auto diff = subtract(updatedScales[i], origScales[i]);
 				diff = multiply(diff, weights[i]);
-				//auto oldVer = ThisSketch::resize(diff, origScales[i - 1].Size(), filter);
+				auto oldVer = ThisSketch::resize(diff, origScales[i - 1].Size(), filter);
 				//auto newVer = ThisSketch::resizeGaussianCpuSimple(diff, origScales[i - 1].Size(), options.upscaleSigma);
-				auto newVer = gpuBlurClaude::singleblurLikeCinder(diff, origScales[i - 1].Size(), options.upscaleSigma, GL_CLAMP_TO_EDGE);
+				//auto newVer = gpuBlurClaude::singleblurLikeCinder(diff, origScales[i - 1].Size());
 				//auto upscaledDiff = options.pyramidOld ? oldVer : newVer;
-				auto const upscaledDiff = newVer;
+				auto const upscaledDiff = oldVer;
 				/*if (i == updatedScales.size() - 5)
 					dbgTex = gtex(options.pyramidOld ? oldVer : newVer);//op(gtex(oldVer)) - gtex(newVer);*/
 				auto& nextScale = updatedScales[i - 1];
@@ -250,7 +250,7 @@ namespace ThisSketch {
 			ci::FilterGaussian filter;
 			//auto dbgImg = img.clone();
 			ivec2 const dstSize = ivec2(vec2(dbgImg.Size()) * options.dbgScaleFactor);
-			auto texOld = gpuBlurClaude::singleblurLikeCinder(gtex(dbgImg), dstSize, options.upscaleSigma, GL_CLAMP_TO_EDGE);
+			auto texOld = gpuBlurClaude::singleblurLikeCinder(gtex(dbgImg), dstSize);
 			//auto texOld = gtex(ThisSketch::resizeGaussianCpuSimple(dbgImg, dbgImg.Size()*2, options.upscaleSigma));
 			auto texNew = gtex(ThisSketch::resize(dbgImg, dstSize, filter));
 

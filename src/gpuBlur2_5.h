@@ -29,7 +29,8 @@ namespace gpuBlur2_5 {
 	gl::TextureRef upscale(gl::TextureRef src, ci::ivec2 toSize);
 	gl::TextureRef upscale(gl::TextureRef src, float hscale, float vscale);
 	// the -1.0f downscaleSigma is a sentinel
-	gl::TextureRef singleblur(gl::TextureRef src, float hscale, float vscale, float sigma = -1.0f, GLenum wrap = GL_CLAMP_TO_BORDER);
+	gl::TextureRef singleblur(gl::TextureRef src, float hscale, float vscale, GLenum wrap);
+	std::vector<gl::TextureRef> buildGaussianPyramid(gl::TextureRef const& src, float scalePerLevel);
 }
 
 namespace gpuBlur = gpuBlur2_5;

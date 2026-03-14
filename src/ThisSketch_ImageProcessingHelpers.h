@@ -42,8 +42,7 @@ namespace ThisSketch {
 	}
 
 	Array2D<float> resize(Array2D<float> src, ivec2 dstSize, const ci::FilterBase& filter);
-	std::vector<Img> buildGaussianPyramid(Img src, float scalePerLevel = 0.5f, float downscaleSigma = -1.0f);
-	std::vector<Img> buildGaussianPyramid_old(Img src, float scalePerLevel = 0.5f);
+	std::vector<Img> buildGaussianPyramid(Img src, float scalePerLevel = 0.5f);
 	
 	gl::TextureRef redToLuminance(gl::TextureRef const& in);
 	float blendHardLight(float base, float blend);

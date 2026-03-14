@@ -66,14 +66,30 @@ namespace ThisSketch {
 		return resultArray;
 	}
 
-	std::vector<Img> buildGaussianPyramid(Img src, float scalePerLevel, float downscaleSigma) {
+	/*std::vector<Img> buildGaussianPyramid(Img src, float scalePerLevel) {
 		auto tex = gtex(src);
-		std::vector<gl::TextureRef> scales = gpuBlurClaude::buildGaussianPyramid(tex, scalePerLevel, downscaleSigma);
+		std::vector<gl::TextureRef> scales = gpuBlurClaude::buildGaussianPyramid(tex, scalePerLevel);
 		std::vector<Img> result;
 		for (auto& scale : scales) {
 			result.push_back(dl<float>(scale));
 		}
 		return result;
+	}*/
+
+	std::vector<Img> buildGaussianPyramid(Img src, float scalePerLevel) {
+		std::vector<Img> scales;
+		auto state = src.clone();
+		static const auto filter = ci::FilterGaussian();
+		while (true)
+		{
+			const int size = std::min(state.w, state.h);
+			if (size <= 2)
+				break;
+			scales.push_back(state);
+			ivec2 newSize = ivec2(vec2(state.Size()) * scalePerLevel);
+			state = ThisSketch::resize(state, newSize, filter);
+		}
+		return scales;
 	}
 
 	Array2D<float> resizeGaussianCpuSimple(Array2D<float> src, ivec2 dstSize, float sigma)
