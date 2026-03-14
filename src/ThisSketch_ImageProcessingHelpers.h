@@ -47,9 +47,6 @@ namespace ThisSketch {
 	gl::TextureRef redToLuminance(gl::TextureRef const& in);
 	float blendHardLight(float base, float blend);
 
-	Array2D<float> resizeGaussianCpuSimple(Array2D<float> const& src, ivec2 dstSize);
-	Array2D<float> resizeGaussianCpuSimple2(Array2D<float> const& src, ivec2 dstSize);
-
-	Array2D<float> resizeGaussianCpuSimple2Trimmed(Array2D<float> const& src, ivec2 dstSize);
+	Array2D<float> resize_referenceImplementation(Array2D<float> const& src, ivec2 dstSize);
 
 } // namespace ThisSketch

@@ -23,11 +23,7 @@ namespace ThisSketch {
 			float weightFactor;
 			bool multiscale;
 			bool binarizePostprocessing;
-			bool pyramidOld;
 			float highPassStrength;
-			float downscaleSigma;
-			float upscaleSigma;
-			float dbgScaleFactor;
 			cfg2 cfg;
 
 			void update() {
@@ -38,19 +34,14 @@ namespace ThisSketch {
 				weightFactor = cfg.getFloat("weightFactor");
 				multiscale = cfg.getBool("multiscale");
 				binarizePostprocessing = cfg.getBool("binarizePostprocessing");
-				pyramidOld = cfg.getBool("pyramidOld");
 				highPassStrength = cfg.getFloat("highPassStrength");
-				downscaleSigma = cfg.getFloat("downscaleSigma");
-				upscaleSigma = cfg.getFloat("upscaleSigma");
-				dbgScaleFactor = cfg.getFloat("dbgScaleFactor");
 
 				cfg.end();
 			}
 		};
 		Options options;
 		bool isPaused = false;
-		gl::TextureRef dbgTex;
-
+		
 		void setup()
 		{
 			reset();
@@ -137,20 +128,13 @@ namespace ThisSketch {
 		Img multiscaleApply(Img src, function<Img(Img)> func) {
 			std::vector<Img> origScales = ThisSketch::buildGaussianPyramid(src, 0.5f);
 			std::vector<Img> updatedScales(origScales.size());
-			static const auto filter = ci::FilterGaussian();
 			const int last = origScales.size() - 1;
 			updatedScales[last] = func(origScales[last]);
 			auto weights = getLevelWeights(origScales.size());
 			for (int i = updatedScales.size() - 1; i >= 1; i--) {
 				auto diff = subtract(updatedScales[i], origScales[i]);
 				diff = multiply(diff, weights[i]);
-				//auto oldVer = ThisSketch::resizeGaussianCpuSimple2Trimmed(diff, origScales[i - 1].Size());
-				//auto newVer = ThisSketch::resizeGaussianCpuSimple(diff, origScales[i - 1].Size(), options.upscaleSigma);
-				auto newVer = gpuBlurClaude::singleblurLikeCinder(diff, origScales[i - 1].Size());
-				//auto upscaledDiff = options.pyramidOld ? oldVer : newVer;
-				auto const upscaledDiff = newVer;
-				/*if (i == updatedScales.size() - 5)
-					dbgTex = gtex(options.pyramidOld ? oldVer : newVer);//op(gtex(oldVer)) - gtex(newVer);*/
+				auto const upscaledDiff = gpuBlurClaude::singleblurLikeCinder(diff, origScales[i - 1].Size());
 				auto& nextScale = updatedScales[i - 1];
 				nextScale = add(origScales[i - 1], upscaledDiff);
 				nextScale = func(nextScale);
@@ -158,8 +142,6 @@ namespace ThisSketch {
 			return updatedScales[0];
 		}
 		void stefanUpdate() {
-			//if (isPaused)
-			//	return;
 			Array2D<float> newImg;
 			if (options.multiscale)
 				newImg = multiscaleApply(img, [this](auto arg) { return updateSingleScale(arg); });
@@ -180,7 +162,7 @@ namespace ThisSketch {
 
 			vector<int> testSizes{ 50, 200, 67, 107, 3 };
 			for (int testSize : testSizes) {
-				//auto newImpl = ThisSketch::resizeGaussianCpuSimple2Trimmed(arr, ivec2(testSize, testSize)); // works
+				//auto newImpl = ThisSketch::resize_referenceImplementation(arr, ivec2(testSize, testSize)); // works
 				auto newImpl = gpuBlurClaude::singleblurLikeCinder(arr, ivec2(testSize, testSize));
 				auto oldImpl = ThisSketch::resize(arr, ivec2(testSize, testSize), ci::FilterGaussian());
 				//mm("new", newImpl);
@@ -255,41 +237,7 @@ namespace ThisSketch {
 				tex = redToLuminance(tex);
 			}
 			gl::draw(tex, getWindowBounds());
-			if (dbgTex) {
-				gl::draw(op(dbgTex) * 100.0f, getWindowBounds());
-			}
-			//drawDbg();
 		}
-//#if 0
-		void drawDbg() {
-			const int lvl = 1;
-
-			Array2D<float> dbgImg(20, 20, 0.0f);
-
-			dbgImg(19, 0) = 1.0f;
-			dbgImg(19, 19) = 1.0f;
-			dbgImg(0, 19) = 1.0f;
-			dbgImg(6, 6) = 1.0f;
-			dbgImg(6, 7) = 1.0f;
-			ci::FilterGaussian filter;
-			//auto dbgImg = img.clone();
-			ivec2 const dstSize = ivec2(vec2(dbgImg.Size()) * options.dbgScaleFactor);
-			auto texOld = gpuBlurClaude::singleblurLikeCinder(gtex(dbgImg), dstSize);
-			//auto texOld = gtex(ThisSketch::resizeGaussianCpuSimple(dbgImg, dbgImg.Size()*2, options.upscaleSigma));
-			auto texNew = gtex(ThisSketch::resize(dbgImg, dstSize, filter));
-
-			auto tex = shade2(texOld, texNew, MULTILINE(
-				float fOld = fetch1();
-				float fNew = fetch1(tex2);
-				float f = abs(fOld - fNew);
-				_out.r = f*100.0;
-				)
-			);
-			tex = options.pyramidOld ? texOld : texNew;
-			tex->setMagFilter(GL_NEAREST);
-			gl::draw(tex, getWindowBounds());
-		}
-//#endif
 	};
 
 }
