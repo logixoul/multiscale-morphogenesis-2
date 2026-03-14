@@ -40,7 +40,8 @@ namespace ThisSketch {
 			}
 		};
 		Options options;
-
+		bool isPaused = false;
+		
 		void setup()
 		{
 			reset();
@@ -61,6 +62,9 @@ namespace ThisSketch {
 		}
 		void keyDown(KeyEvent e)
 		{
+			if (keys['p']) {
+				isPaused = !isPaused;
+			}
 			if (keys['r'])
 			{
 				reset();
@@ -122,16 +126,15 @@ namespace ThisSketch {
 			return result;
 		}
 		Img multiscaleApply(Img src, function<Img(Img)> func) {
-			std::vector<Img> origScales = ThisSketch::buildGaussianPyramid(src);
+			std::vector<Img> origScales = ThisSketch::buildGaussianPyramid(src, 0.5f);
 			std::vector<Img> updatedScales(origScales.size());
-			static const auto filter = ci::FilterGaussian();
 			const int last = origScales.size() - 1;
 			updatedScales[last] = func(origScales[last]);
 			auto weights = getLevelWeights(origScales.size());
 			for (int i = updatedScales.size() - 1; i >= 1; i--) {
 				auto diff = subtract(updatedScales[i], origScales[i]);
 				diff = multiply(diff, weights[i]);
-				auto upscaledDiff = ThisSketch::resize(diff, origScales[i - 1].Size(), filter);
+				auto const upscaledDiff = gpuBlurClaude::singleblurLikeCinder(diff, origScales[i - 1].Size());
 				auto& nextScale = updatedScales[i - 1];
 				nextScale = add(origScales[i - 1], upscaledDiff);
 				nextScale = func(nextScale);
@@ -139,11 +142,38 @@ namespace ThisSketch {
 			return updatedScales[0];
 		}
 		void stefanUpdate() {
+			Array2D<float> newImg;
 			if (options.multiscale)
-				img = multiscaleApply(img, [this](auto arg) { return updateSingleScale(arg); });
+				newImg = multiscaleApply(img, [this](auto arg) { return updateSingleScale(arg); });
 			else
-				img = updateSingleScale(img);
+				newImg = updateSingleScale(img);
+			if(!isPaused)
+				img = newImg;
 			img = to01(img);
+
+			//testMatchingFunctionality();
+		}
+
+		void testMatchingFunctionality() {
+			Array2D<float> arr(100, 100);
+			forxy(arr) {
+				arr(p) = ::randFloat();
+			}
+
+			vector<int> testSizes{ 50, 200, 67, 107, 3 };
+			for (int testSize : testSizes) {
+				//auto newImpl = ThisSketch::resize_referenceImplementation(arr, ivec2(testSize, testSize)); // works
+				auto newImpl = gpuBlurClaude::singleblurLikeCinder(arr, ivec2(testSize, testSize));
+				auto oldImpl = ThisSketch::resize(arr, ivec2(testSize, testSize), ci::FilterGaussian());
+				//mm("new", newImpl);
+				//mm("old", oldImpl);
+				
+				forxy(newImpl) {
+					if (abs(newImpl(p) - oldImpl(p)) > 0.0001) {
+						std::cout << "[" << testSize << "] mismatch at " << p.x << ", " << p.y << ": " << newImpl(p) << " vs " << oldImpl(p) << std::endl;
+					}
+				}
+			}
 		}
 
 		static gl::TextureRef gpuHighpass(gl::TextureRef in, float strength) {

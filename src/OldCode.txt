@@ -86,179 +86,8 @@ vec3 complexToColor(vec2 comp) {
 		}
 		return ::merge(inChans);
 	}
-	void renderIt() {
-		static Array2D<float> sizeSource(sx, sy);
-		static auto sizeSourceTex = gtex(sizeSource);
-		static auto walkerTex = Shade().tex(sizeSourceTex).expr("vec3(0.0);").run();
-		if(!pause) {
-			walkerTex = Shade().tex(walkerTex).expr("fetch3()*.99;").run();
-			glPushAttrib(GL_ALL_ATTRIB_BITS);
-			glUseProgram(0);
-			glPointSize(2);
-			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-			glEnable(GL_BLEND);
-			{
-				beginRTT(walkerTex);
-				{
-					gl::pushMatrices();
-					gl::setMatricesWindow(sx, sy, true);
-					{
-						glBegin(GL_POINTS);
-						{
-							foreach(Walker& walker, walkers) {
-								auto& c = walker.color;
-								glColor4f(c.x, c.y, c.z, walker.alpha());
-								glVertex2f(walker.pos);
-							}
-						}
-						glEnd();
-					}
-					gl::popMatrices();
-				}
-				endRTT();
-			}
-			glPopAttrib();
-		}
-
-		auto walkerImg = gettexdata<vec3>(walkerTex, GL_RGB, GL_FLOAT, walkerTex.getCleanBounds());
-		walkerImg = convolveLongtail(walkerImg);
-		auto walkerTex2 = gtex(walkerImg);
-
-		//walkerTex = gpuBlur2_4::run_longtail(walkerTex, 3, 1.0);
-		auto walkerTex3 = shade2(walkerTex, walkerTex2, "_out.rgb = tc.x > .5 ? fetch3() : fetch3(tex2) * 600.0;");
-
-		if(::texOverride) {
-			gl::draw(texToDraw, getWindowBounds());
-		} else {
-			gl::draw(walkerTex3, getWindowBounds());
-		}
-	}
-#else
-
+	
 ////////////////
-
-	template<class T>
-	static Array2D<T> gauss3_weightAdjusting(Array2D<T> src) {
-		T zero = ::zero<T>();
-		Array2D<T> dst1(src.w, src.h);
-		Array2D<T> dst2(src.w, src.h);
-		forxy(dst1) {
-			dst1(p) = .25f * (2.0f * get_clamped(src, p.x, p.y) + get_clamped(src, p.x - 1, p.y) + get_clamped(src, p.x + 1, p.y));
-		}
-		forxy(dst2) {
-			vector<float> weights = { .25, .5, .25 };
-			if (p.y == 0) weights[0] = 0.0f;
-			if (p.y == src.h - 1) weights[2] = 0.0f;
-			float sumW = ::accumulate(weights.begin(), weights.end(), 0.0f);
-			for (auto& weight : weights) weight /= sumW;
-			dst2(p) = weights[1] * get_clamped(dst1, p.x, p.y) + weights[0] * get_clamped(dst1, p.x, p.y - 1) + weights[2] * get_clamped(dst1, p.x, p.y + 1);
-		}
-		return dst2;
-	}
-
-//////////////
-
-
-	void repel(Material& a, Material& b) {
-		throw 0;
-		auto offsets = empty_like(a.tmpEnergy);
-
-		auto guidance = gaussianBlur<float, WrapModes::GetClamped>(b.img, 4 * 2 + 1);
-		forxy(a.img) {
-			auto g = gradient_i<float, WrapModes::GetClamped>(guidance, p);
-			g = -safeNormalized(g) * .2f;
-
-			a.tmpEnergy(p) += g * a.img(p);
-			//offsets(p) = g * a.img(p);
-		}
-		//advect(a, offsets);
-	}
-
-============
-
-void doFluidStep() {
-		red.ComputeDensityPressure();
-		red.ComputeForces();
-		red.Integrate();
-		return;
-		/*
-		surfTensionThres = cfg1::cfg2("surfTensionThres", .04f,
-			[&]() { return keys['6']; },
-			[&]() { return expRange(mouseY, 0.1f, 50000.0f); });
-
-		auto surfTension = cfg1::cfg2("surfTension", 1.0f,
-			[&]() { return keys['7']; },
-			[&]() { return expRange(mouseY, .0001f, 40000.0f); });
-		auto gravity = cfg1::cfg2("gravity", .1f,//0.0f,//.1f,
-			[&]() { return keys['8']; },
-			[&]() { return expRange(mouseY, .0001f, 40000.0f); });
-		auto incompressibilityCoef = cfg1::cfg2("incompressibilityCoef", 10.0f,
-			[&]() { return keys['/']; },
-			[&]() { return expRange(mouseY, .0001f, 40000.0f); });
-
-
-		//for (int i = 0; i < 4; i++) {
-			//repel(::red, ::green);
-			//repel(::green, ::red);
-		//}
-
-		auto imgForAdvect = Array2D<float>(sz);
-		for (auto* mat : materials) {
-			for (auto& particle : mat->particles) {
-				aaPoint<float, WrapModes::GetClamped>(imgForAdvect, particle.pos, 1);
-			}
-		}
-		for (int i = 0; i < 10; i++) {
-			imgForAdvect = ::gaussianBlur<float, WrapModes::GetClamped>(imgForAdvect, 3 * 2 + 1);
-		}
-		//auto grads = get_gradients(imgForAdvect);
-
-		for (auto material : ::materials) {
-			auto& particles = material->particles;
-			auto img_b = imgForAdvect;
-			//for(int i < 0
-			//img_b = gaussianBlur<float, WrapModes::GetClamped>(imgForAdvect, 3 * 2 + 1);
-			auto& guidance = img_b;
-			for (auto& particle : material->particles) {
-				particle.velocity += vec2(0.0f, gravity);
-
-				auto g = gradient_i<float, WrapModes::Get_WrapZeros>(guidance, particle.pos);
-				if (img_b(particle.pos) < surfTensionThres)
-				{
-					g = g * surfTension * imgForAdvect(particle.pos);
-				}
-				else
-				{
-					g *= -incompressibilityCoef;
-				}
-
-				particle.velocity += g;
-			}
-
-			advect(*material);
-		}
-
-
-	}
-	void advect(Material& material) {
-		for (auto& particle : material.particles) {
-			vec2 newPos = particle.pos + particle.velocity;
-			for (int dim = 0; dim <= 1; dim++) {
-				const float damping = 0.9f;
-				float maxVal = sz[dim] - 1;
-				if (newPos[dim] > maxVal) {
-					particle.velocity[dim] *= -1.0f * damping;
-					newPos[dim] = maxVal - (newPos[dim] - maxVal);
-				}
-				if (newPos[dim] < 0) {
-					particle.velocity[dim] *= -1.0f * damping;
-					newPos[dim] = -newPos[dim];
-				}
-			}
-			particle.pos = newPos;
-		}
-	}
-};
 
 
 		/*auto gradients = dl<vec2>(gradientsTex);
@@ -395,3 +224,35 @@ void doFluidStep() {
 		}*/
 		return img;
 	}
+
+
+=======================
+
+		void drawDbg() {
+			const int lvl = 1;
+
+			Array2D<float> dbgImg(20, 20, 0.0f);
+
+			dbgImg(19, 0) = 1.0f;
+			dbgImg(19, 19) = 1.0f;
+			dbgImg(0, 19) = 1.0f;
+			dbgImg(6, 6) = 1.0f;
+			dbgImg(6, 7) = 1.0f;
+			ci::FilterGaussian filter;
+			//auto dbgImg = img.clone();
+			ivec2 const dstSize = ivec2(vec2(dbgImg.Size()) * options.dbgScaleFactor);
+			auto texOld = gpuBlurClaude::singleblurLikeCinder(gtex(dbgImg), dstSize);
+			//auto texOld = gtex(ThisSketch::resizeGaussianCpuSimple(dbgImg, dbgImg.Size()*2, options.upscaleSigma));
+			auto texNew = gtex(ThisSketch::resize(dbgImg, dstSize, filter));
+
+			auto tex = shade2(texOld, texNew, MULTILINE(
+				float fOld = fetch1();
+				float fNew = fetch1(tex2);
+				float f = abs(fOld - fNew);
+				_out.r = f*100.0;
+				)
+			);
+			tex = options.pyramidOld ? texOld : texNew;
+			tex->setMagFilter(GL_NEAREST);
+			gl::draw(tex, getWindowBounds());
+		}

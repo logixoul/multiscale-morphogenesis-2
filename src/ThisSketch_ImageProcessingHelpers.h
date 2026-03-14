@@ -43,8 +43,10 @@ namespace ThisSketch {
 
 	Array2D<float> resize(Array2D<float> src, ivec2 dstSize, const ci::FilterBase& filter);
 	std::vector<Img> buildGaussianPyramid(Img src, float scalePerLevel = 0.5f);
-
+	
 	gl::TextureRef redToLuminance(gl::TextureRef const& in);
 	float blendHardLight(float base, float blend);
+
+	Array2D<float> resize_referenceImplementation(Array2D<float> const& src, ivec2 dstSize);
 
 } // namespace ThisSketch

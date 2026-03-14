@@ -33,7 +33,7 @@ namespace gpuBlur2_5 {
 		auto state = shade2(src, "_out.rgb = fetch3();");
 
 		for (int i = 0; i < lvls; i++) {
-			state = singleblur(state, .5, .5);
+			state = singleblur(state, .5, .5, GL_CLAMP_TO_BORDER);
 		}
 		state = upscale(state, src->getSize());
 		return state;
@@ -70,7 +70,7 @@ namespace gpuBlur2_5 {
 			"_out.rgb = fetch3() * _mul;",
 			ShadeOpts().uniform("_mul", 1.0f / sumw));
 		for (int i = 0; i < lvls; i++) {
-			auto newZoomstate = singleblur(zoomstates[i], hscale, vscale);
+			auto newZoomstate = singleblur(zoomstates[i], hscale, vscale, GL_CLAMP_TO_BORDER);
 			zoomstates.push_back(newZoomstate);
 			if (newZoomstate->getWidth() < 1 || newZoomstate->getHeight() < 1) throw runtime_error("too many blur levels");
 		}
@@ -142,10 +142,16 @@ namespace gpuBlur2_5 {
 			, lib);
 		return vscaled;
 	}
+	// todo: move this to stuff.cpp/h
+	void setTextureBorderColor(gl::TextureRef tex, float r, float g, float b, float a) {
+		bind(tex);
+		float color[] = { r, g, b, a };
+		glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, color);
+	}
 	gl::TextureRef singleblur(gl::TextureRef src, float hscale, float vscale, GLenum wrap) {
 		GPU_SCOPE("singleblur");
 		//float gaussW = mouseY * 4 + .1;
-		float gaussW = 4;
+		float gaussW = 4.0f;
 		//cout << "2020gauss=" << gaussW<<endl;
 		
 		/*float w0 = (mouseY - .5) * .01 + .9958f;
@@ -173,18 +179,21 @@ namespace gpuBlur2_5 {
 			+ weights.str() +
 			"_out.rgb = w2 * (aM2 + aP2) + w1 * (aM1 + aP1) + w0 * a0;";
 
+		setWrap(src, wrap);
+		if (wrap == GL_CLAMP_TO_BORDER) {
+			setTextureBorderColor(src, 0, 0, 0, 0);
+		}
 		//setWrapBlack(src);
-		//setWrap(src, wrap);
-		setWrapBlack(src);
 		auto hscaled = shade2(src, shader,
 			ShadeOpts()
 				.scale(hscale, 1.0f)
 				.uniform("GB2_offsetX", 1.0f)
 				.uniform("GB2_offsetY", 0.0f)
 			);
-		//setWrapBlack(hscaled);
-		//setWrap(hscaled, wrap);
-		setWrapBlack(hscaled);
+		setWrap(hscaled, wrap);
+		if (wrap == GL_CLAMP_TO_BORDER) {
+			setTextureBorderColor(hscaled, 0, 0, 0, 0);
+		}
 		auto vscaled = shade2(hscaled, shader,
 			ShadeOpts()
 			.uniform("GB2_offsetX", 0.0f)
@@ -193,4 +202,18 @@ namespace gpuBlur2_5 {
 		return vscaled;
 	}
 
+	std::vector<gl::TextureRef> buildGaussianPyramid(gl::TextureRef const& src, float scalePerLevel) {
+		std::vector<gl::TextureRef> result;
+		result.push_back(src);
+		auto state = src;
+		while (true) {
+			int minDim = std::min(state->getWidth(), state->getHeight());
+			if (minDim <= 2)
+				break;
+			ivec2 dstSize = ivec2(state->getWidth() * scalePerLevel, state->getHeight() * scalePerLevel);
+			state = singleblur(state, scalePerLevel, scalePerLevel, GL_CLAMP_TO_BORDER);
+			result.push_back(state);
+		}
+		return result;
+	}
 }

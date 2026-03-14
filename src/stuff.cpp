@@ -167,7 +167,6 @@ float niceExpRangeY(float mouseY, float min, float max) {
 	float y2 = sign(mouseY)*std::max(0.0f, abs(mouseY) - 40.0f / (float)App::get()->getWindowHeight());
 	return sign(y2)*expRange(abs(y2), min, max);
 }
-
 void setWrapBlack(gl::TextureRef tex) {
 	// I think the border color is transparent black by default. It doesn't hurt that it is transparent.
 	bind(tex);

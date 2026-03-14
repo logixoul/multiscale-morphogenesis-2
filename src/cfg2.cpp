@@ -37,25 +37,27 @@ template<class T> T& getOpt_Base(string const& name, T defaultValue) {
 	return ref;
 }*/
 
+// Note: using value_or throughout to handle the "entire table doesn't exist" possibility
 float cfg2::getFloat(string const& name) {
 	auto subTable = tbl.at_path("param." + name);
-	float& ref = getOpt_Base<float>(name, subTable["default"].ref<double>());
+	float& ref = getOpt_Base<float>(name, subTable["default"].value_or(0.5));
 
 	ImGui::DragFloat(
 		name.c_str(),
 		&ref,
-		subTable["speed"].ref<double>(),
-		subTable["min"].ref<double>(),
-		subTable["max"].ref<double>(),
+		subTable["speed"].value_or(.1),
+		subTable["min"].value_or(-100.0),
+		subTable["max"].value_or(100.0),
 		"%.3f",
-		subTable["logarithmic"].value_or<bool>(false) ? ImGuiSliderFlags_Logarithmic : ImGuiSliderFlags_None);
+		subTable["logarithmic"].value_or(false) ? ImGuiSliderFlags_Logarithmic : ImGuiSliderFlags_None);
 
 	return ref;
 }
 
+// Note: using value_or throughout to handle the "entire table doesn't exist" possibility
 bool cfg2::getBool(string const& name) {
 	auto val = tbl.at_path("param." + name);
-	auto& ref = getOpt_Base<bool>(name, val["default"].ref<bool>());
+	auto& ref = getOpt_Base<bool>(name, val["default"].value_or(false));
 	ImGui::Checkbox(name.c_str(), &ref);
 	return ref;
 }
