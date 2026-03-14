@@ -148,10 +148,10 @@ namespace gpuBlur2_5 {
 		float color[] = { r, g, b, a };
 		glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, color);
 	}
-	gl::TextureRef singleblur(gl::TextureRef src, float hscale, float vscale, GLenum wrap) {
+	gl::TextureRef singleblur(gl::TextureRef src, float hscale, float vscale, float sigma, GLenum wrap) {
 		GPU_SCOPE("singleblur");
 		//float gaussW = mouseY * 4 + .1;
-		float gaussW = 4;
+		float gaussW = sigma == -1.0f ? 4.0f : sigma;
 		//cout << "2020gauss=" << gaussW<<endl;
 		
 		/*float w0 = (mouseY - .5) * .01 + .9958f;

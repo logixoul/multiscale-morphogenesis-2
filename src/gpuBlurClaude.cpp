@@ -5,13 +5,13 @@
 #include "stuff.h"
 
 namespace gpuBlurClaude {
-	std::vector<gl::TextureRef> buildGaussianPyramid(gl::TextureRef const& src, float scalePerLevel) {
+	std::vector<gl::TextureRef> buildGaussianPyramid(gl::TextureRef const& src, float scalePerLevel, float downscaleSigma) {
 		std::vector<gl::TextureRef> result;
 		result.push_back(src);
 		auto state = src;
 		int minDim = std::min(src->getWidth(), src->getHeight());
 		while (minDim > 2) {
-			state = gpuBlur2_5::singleblur(state, scalePerLevel, scalePerLevel, GL_CLAMP_TO_EDGE);
+			state = gpuBlur2_5::singleblur(state, scalePerLevel, scalePerLevel, downscaleSigma, GL_CLAMP_TO_EDGE);
 			result.push_back(state);
 			minDim *= scalePerLevel;
 		}

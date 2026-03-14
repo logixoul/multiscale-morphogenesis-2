@@ -91,14 +91,27 @@ namespace ThisSketch {
 		return scales;
 	}
 
-	std::vector<Img> buildGaussianPyramid(Img src, float scalePerLevel) {
-		auto tex = gtex(src);
-		std::vector<gl::TextureRef> scales = gpuBlurClaude::buildGaussianPyramid(tex, scalePerLevel);
+	std::vector<Img> buildGaussianPyramid(Img src, float scalePerLevel, float downscaleSigma) {
+		std::vector<Img> scales;
+		auto state = src.clone();
+		while (true)
+		{
+			const int size = std::min(state.w, state.h);
+			if (size <= 2)
+				break;
+			scales.push_back(state);
+			ivec2 newSize = ivec2(vec2(state.Size()) * scalePerLevel);
+			state = ThisSketch::resizeGaussianCpuSimple(state, newSize, downscaleSigma);
+		}
+		return scales;
+
+		/*auto tex = gtex(src);
+		std::vector<gl::TextureRef> scales = gpuBlurClaude::buildGaussianPyramid(tex, scalePerLevel, downscaleSigma);
 		std::vector<Img> result;
 		for (auto& scale : scales) {
 			result.push_back(dl<float>(scale));
 		}
-		return result;
+		return result;*/
 	}
 
 	gl::TextureRef redToLuminance(gl::TextureRef const& in) {
@@ -115,6 +128,72 @@ namespace ThisSketch {
 		else {
 			return 1.0f - 2.0f * (1.0f - base) * (1.0f - blend);
 		}
+	}
+
+	Array2D<float> resizeGaussianCpuSimple(Array2D<float> src, ivec2 dstSize, float sigma)
+	{
+		auto clampi = [](int v, int lo, int hi, bool* outOfBounds) {
+			*outOfBounds = (v < lo) || (v > hi);
+			return std::max(lo, std::min(v, hi));
+		};
+
+		const float scaleX = float(src.w) / float(dstSize.x);
+		const float scaleY = float(src.h) / float(dstSize.y);
+
+		// If sigma is not provided, pick a scale-aware default for downsampling.
+		const float sigmaX = (sigma > 0.0f) ? sigma : std::max(0.001f, 0.5f * scaleX);
+		const float sigmaY = (sigma > 0.0f) ? sigma : std::max(0.001f, 0.5f * scaleY);
+
+		const int radiusX = 2;// std::max(1, int(std::ceil(1.0f * sigmaX)));
+		const int radiusY = 2;// std::max(1, int(std::ceil(1.0f * sigmaY)));
+
+		Array2D<float> tmp(dstSize.x, src.h);
+		Array2D<float> out(dstSize.x, dstSize.y);
+
+		// Horizontal pass: src -> tmp
+		for (int y = 0; y < src.h; ++y) {
+			for (int x = 0; x < dstSize.x; ++x) {
+				const float srcX = (x + 0.5f) * scaleX - 0.5f;
+
+				float sum = 0.0f;
+				float wsum = 0.0f;
+				for (int k = -radiusX; k <= radiusX; ++k) {
+					//const int ix = clampi(int(std::floor(srcX + k + 0.5f)), 0, src.w - 1);
+					bool outOfBounds;
+					const int ix = clampi(int(std::floor(srcX + k + 0.5f)), 0, src.w - 1, &outOfBounds);
+					const float d = (ix - srcX) / sigmaX;
+					const float w = std::exp(-0.5f * d * d);
+					if (!outOfBounds) {
+						sum += w * src.data[y * src.w + ix];
+						wsum += w;
+					}
+				}
+				tmp.data[y * tmp.w + x] = sum / wsum;
+			}
+		}
+
+		// Vertical pass: tmp -> out
+		for (int y = 0; y < dstSize.y; ++y) {
+			const float srcY = (y + 0.5f) * scaleY - 0.5f;
+
+			for (int x = 0; x < dstSize.x; ++x) {
+				float sum = 0.0f;
+				float wsum = 0.0f;
+				for (int k = -radiusY; k <= radiusY; ++k) {
+					bool outOfBounds;
+					const int iy = clampi(int(std::floor(srcY + k + 0.5f)), 0, src.h - 1, &outOfBounds);
+					const float d = (iy - srcY) / sigmaY;
+					const float w = std::exp(-0.5f * d * d);
+					if (!outOfBounds) {
+						sum += w * tmp.data[iy * tmp.w + x];
+						wsum += w;
+					}
+				}
+				out.data[y * out.w + x] = sum / wsum;
+			}
+		}
+
+		return out;
 	}
 
 }

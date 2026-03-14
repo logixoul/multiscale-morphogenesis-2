@@ -25,6 +25,7 @@ namespace ThisSketch {
 			bool binarizePostprocessing;
 			bool pyramidOld;
 			float highPassStrength;
+			float downscaleSigma;
 			cfg2 cfg;
 
 			void update() {
@@ -37,11 +38,13 @@ namespace ThisSketch {
 				binarizePostprocessing = cfg.getBool("binarizePostprocessing");
 				pyramidOld = cfg.getBool("pyramidOld");
 				highPassStrength = cfg.getFloat("highPassStrength");
+				downscaleSigma = cfg.getFloat("downscaleSigma");
 
 				cfg.end();
 			}
 		};
 		Options options;
+		bool isPaused = false;
 
 		void setup()
 		{
@@ -63,6 +66,9 @@ namespace ThisSketch {
 		}
 		void keyDown(KeyEvent e)
 		{
+			if (keys['p']) {
+				isPaused = !isPaused;
+			}
 			if (keys['r'])
 			{
 				reset();
@@ -124,7 +130,7 @@ namespace ThisSketch {
 			return result;
 		}
 		Img multiscaleApply(Img src, function<Img(Img)> func) {
-			std::vector<Img> origScales = options.pyramidOld ? ThisSketch::buildGaussianPyramid_old(src) : ThisSketch::buildGaussianPyramid(src);
+			std::vector<Img> origScales = options.pyramidOld ? ThisSketch::buildGaussianPyramid_old(src) : ThisSketch::buildGaussianPyramid(src, 0.5f, options.downscaleSigma);
 			std::vector<Img> updatedScales(origScales.size());
 			static const auto filter = ci::FilterGaussian();
 			const int last = origScales.size() - 1;
@@ -141,6 +147,8 @@ namespace ThisSketch {
 			return updatedScales[0];
 		}
 		void stefanUpdate() {
+			if (isPaused)
+				return;
 			if (options.multiscale)
 				img = multiscaleApply(img, [this](auto arg) { return updateSingleScale(arg); });
 			else
@@ -208,6 +216,29 @@ namespace ThisSketch {
 			else {
 				tex = redToLuminance(tex);
 			}
+			gl::draw(tex, getWindowBounds());
+			drawDbg();
+		}
+		void drawDbg() {
+			const int lvl = 3;
+
+			/*Array2D<float> dbgImg(20, 20, 0.0f);
+			dbgImg(5, 5) = 100.0f;
+			dbgImg(6, 6) = 100.0f;
+			dbgImg(6, 7) = 100.0f;*/
+			auto dbgImg = img.clone();
+
+			auto texOld = gtex(ThisSketch::buildGaussianPyramid_old(dbgImg)[lvl]);
+			auto texNew = gtex(ThisSketch::buildGaussianPyramid(dbgImg, 0.5f, options.downscaleSigma)[lvl]);
+			auto tex = shade2(texOld, texNew, MULTILINE(
+				float fOld = fetch1();
+				float fNew = fetch1(tex2);
+				float f = abs(fOld - fNew);
+				_out.r = f*100.0;
+				)
+			);
+			//tex = options.pyramidOld ? texOld : texNew;
+			tex->setMagFilter(GL_NEAREST);
 			gl::draw(tex, getWindowBounds());
 		}
 	};
