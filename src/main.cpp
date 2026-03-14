@@ -180,8 +180,8 @@ namespace ThisSketch {
 
 			vector<int> testSizes{ 50, 200, 67, 107, 3 };
 			for (int testSize : testSizes) {
-				auto newImpl = ThisSketch::resizeGaussianCpuSimple2Trimmed(arr, ivec2(testSize, testSize));
-				//auto newImpl = ThisSketch::resizeGaussianCpuSimple2(arr, ivec2(testSize, testSize)); // works
+				//auto newImpl = ThisSketch::resizeGaussianCpuSimple2Trimmed(arr, ivec2(testSize, testSize)); // works
+				auto newImpl = gpuBlurClaude::singleblurLikeCinder(arr, ivec2(testSize, testSize));
 				auto oldImpl = ThisSketch::resize(arr, ivec2(testSize, testSize), ci::FilterGaussian());
 				//mm("new", newImpl);
 				//mm("old", oldImpl);

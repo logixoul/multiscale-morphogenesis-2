@@ -11,8 +11,15 @@ namespace gpuBlurClaude {
 		float color[] = { r, g, b, a };
 		glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, color);
 	}
+	gl::TextureRef gtexF32(Array2D<float> a)
+	{
+		gl::TextureRef tex = maketex(a.w, a.h, GL_R32F);
+		bind(tex);
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, a.w, a.h, GL_RED, GL_FLOAT, a.data);
+		return tex;
+	}
 	Array2D<float> singleblurLikeCinder(Array2D<float> src, ivec2 dstSize) {
-		return dl<float>(singleblurLikeCinder(gtex(src), dstSize));
+		return dl<float>(singleblurLikeCinder(gtexF32(src), dstSize));
 	}
 	gl::TextureRef singleblurLikeCinder(gl::TextureRef src, ivec2 dstSize) {
 		GPU_SCOPE("singleblur");
@@ -29,13 +36,13 @@ namespace gpuBlurClaude {
 			"float cen = (dstX + .5f) / scaleX;"
 			"int start = int(cen - support + 0.5f);"
 			"int end = int(cen + support + 0.5f);"
+			"start = max(0, start);"
+			"end = min(int(texSize.x), end);"
 			"for (int i = start; i < end; ++i) {"
-			"    if (i < 0 || i >= int(texSize.x)) continue;"
 			"	 float d = (float(i) + 0.5f - cen) / filterScaleX;"
 			"	 float w = exp(-2.0f * d * d);"
-			"    vec2 tcNeighbor = vec2(ivec2(i, dstY));"
-			"	 tcNeighbor = (tcNeighbor + .5) * tsize;"
-			"    sum += w * texture(tex, tcNeighbor).r;"
+			"    ivec2 pos = ivec2(i, dstY);"
+			"    sum += w * texelFetch(tex, pos, 0).r;"
 			"    wsum += w;"
 			"}"
 			"_out.r = sum / wsum;"
@@ -51,13 +58,13 @@ namespace gpuBlurClaude {
 			"float cen = (dstY + .5f) / scaleY;"
 			"int start = int(cen - support + 0.5f);"
 			"int end = int(cen + support + 0.5f);"
+			"start = max(0, start);"
+			"end = min(int(texSize.y), end);"
 			"for (int i = start; i < end; ++i) {"
-			"    if (i < 0 || i >= int(texSize.y)) continue;"
 			"	 float d = (float(i) + 0.5f - cen) / filterScaleY;"
 			"	 float w = exp(-2.0f * d * d);"
-			"    vec2 tcNeighbor = vec2(ivec2(dstX, i));"
-			"	 tcNeighbor = (tcNeighbor + .5) * tsize;"
-			"    sum += w * texture(tex, tcNeighbor).r;"
+			"    ivec2 pos = ivec2(dstX, i);"
+			"    sum += w * texelFetch(tex, pos, 0).r;"
 			"    wsum += w;"
 			"}"
 			"_out.r = sum / wsum;"

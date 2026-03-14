@@ -188,16 +188,16 @@ namespace ThisSketch {
 
 		for (int dstY = 0; dstY < srcH; ++dstY) {
 			for (int dstX = 0; dstX < dstW; ++dstX) {
-				const float cen = (dstX + .5f) / sx;
-				int start = (int)(cen - supportX + 0.5f);
-				int end = (int)(cen + supportX + 0.5f);
+				const float center = (dstX + .5f) / sx;
+				int start = (int)(center - supportX + 0.5f);
+				int end = (int)(center + supportX + 0.5f);
 				if (start < 0) start = 0;
 				if (end > srcW) end = srcW;
 
 				float den = 0.0f;
 				float sum = 0.0f;
 				for (int i = start; i < end; ++i) {
-					float d = (i + 0.5f - cen) / filterScaleX;
+					float d = (i + 0.5f - center) / filterScaleX;
 					float w = filter(d);
 					sum += w * src.data[dstY * srcW + i];
 					den += w;
@@ -208,9 +208,9 @@ namespace ThisSketch {
 		}
 
 		for (int dstY = 0; dstY < dstH; ++dstY) {
-			const float cen = (dstY + .5f) / sy;
-			int start = (int)(cen - supportY + 0.5f);
-			int end = (int)(cen + supportY + 0.5f);
+			const float center = (dstY + .5f) / sy;
+			int start = (int)(center - supportY + 0.5f);
+			int end = (int)(center + supportY + 0.5f);
 			if (start < 0) start = 0;
 			if (end > srcH) end = srcH;
 
@@ -219,7 +219,7 @@ namespace ThisSketch {
 				float sum = 0.0f;
 				float den = 0.0f;
 				for (int i = start; i < end; ++i) {
-					float d = (i + 0.5f - cen) / filterScaleY;
+					float d = (i + 0.5f - center) / filterScaleY;
 					float w = filter(d);
 					sum += w * tmp.data[i * dstW + dstX];
 					den += w;
