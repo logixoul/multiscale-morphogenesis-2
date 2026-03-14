@@ -87,7 +87,7 @@ namespace ThisSketch {
 				break;
 			scales.push_back(state);
 			ivec2 newSize = ivec2(vec2(state.Size()) * scalePerLevel);
-			state = ThisSketch::resizeGaussianCpuSimple2(state, newSize);
+			state = ThisSketch::resizeGaussianCpuSimple2Trimmed(state, newSize);
 		}
 		return scales;
 	}
@@ -159,58 +159,97 @@ namespace ThisSketch {
 
 	Array2D<float> resizeGaussianCpuSimple2Trimmed(Array2D<float> src, ivec2 dstSize)
 	{
+		const int srcW = src.w;
+		const int srcH = src.h;
 		const int dstW = dstSize.x;
 		const int dstH = dstSize.y;
 
-		const float scaleX = dstW / (float)src.w;
-		const float scaleY = dstH / (float)src.h;
-		
-		const float support = 1.25f;
-		const float filterScaleX = std::max(1.0f, 1.0f / scaleX);
-		const float filterScaleY = std::max(1.0f, 1.0f / scaleY);
-		const float supportX = std::max(0.5f, filterScaleX * support);
-		const float supportY = std::max(0.5f, filterScaleY * support);
+		const float sx = dstW / (float)srcW;
+		const float sy = dstH / (float)srcH;
 
-		Array2D<float> tmp(dstW, src.h);
+		ci::FilterGaussian filter;
+
+		const float filterScaleX = std::max(1.0f, 1.0f / sx);
+		const float filterScaleY = std::max(1.0f, 1.0f / sy);
+		const float supportX = std::max(0.5f, filterScaleX * filter.getSupport());
+		const float supportY = std::max(0.5f, filterScaleY * filter.getSupport());
+
+		Array2D<float> tmp(dstW, srcH);
 		Array2D<float> out(dstW, dstH);
 
-		for (int dstY = 0; dstY < src.h; ++dstY) {
+		for (int dstY = 0; dstY < srcH; ++dstY) {
 			for (int dstX = 0; dstX < dstW; ++dstX) {
-				const float cen = (dstX + .5f) / scaleX;
+				const float cen = (dstX + .5f) / sx;
 				int start = (int)(cen - supportX + 0.5f);
 				int end = (int)(cen + supportX + 0.5f);
+				if (start < 0) start = 0;
+				if (end > srcW) end = srcW;
 
+				float den = 0.0f;
+				for (int i = start; i < end; ++i) {
+					den += filter((i + 0.5f - cen) / filterScaleX);
+				}
+
+				const float sc = (den == 0.0f) ? 1.0f : (1.0f / den);
 				float sum = 0.0f;
 				float wsum = 0.0f;
 				for (int i = start; i < end; ++i) {
-					if (i < 0 || i >= src.w) continue;
+					//float w = sc * filter((i + 0.5f - cen) / filterScaleX);
 					float d = i + 0.5f - cen;
-					float w = exp(-2.0f * d * d);
-					sum += w * src(i, dstY);
+					float w = sc * exp(-2.0f * d * d / filterScaleX);
+					sum += w * src.data[dstY * srcW + i];
 					wsum += w;
 				}
 
-				tmp.data[dstY * dstW + dstX] = sum / wsum;
+				if (wsum == 0.0f) {
+					int mid = (start + end) >> 1;
+					if (mid < 0) mid = 0;
+					if (mid >= srcW) mid = srcW - 1;
+					tmp.data[dstY * dstW + dstX] = src.data[dstY * srcW + mid];
+				}
+				else {
+					int ic = (int)(cen + 0.5f);
+					if (ic < start) ic = start;
+					else if (ic >= end) ic = end - 1;
+					tmp.data[dstY * dstW + dstX] = sum + (1.0f - wsum) * src.data[dstY * srcW + ic];
+				}
 			}
 		}
 
 		for (int dstY = 0; dstY < dstH; ++dstY) {
-			const float cen = (dstY + .5f) / scaleY;
+			const float cen = (dstY + .5f) / sy;
 			int start = (int)(cen - supportY + 0.5f);
 			int end = (int)(cen + supportY + 0.5f);
+			if (start < 0) start = 0;
+			if (end > srcH) end = srcH;
 
+			float den = 0.0f;
+			for (int i = start; i < end; ++i) {
+				den += filter((i + 0.5f - cen) / filterScaleY);
+			}
+
+			const float sc = (den == 0.0f) ? 1.0f : (1.0f / den);
 			for (int dstX = 0; dstX < dstW; ++dstX) {
 				float sum = 0.0f;
 				float wsum = 0.0f;
 				for (int i = start; i < end; ++i) {
-					if (i < 0 || i >= src.h) continue;
-					float d = i + 0.5f - cen;
-					float w = exp(-2.0f * d * d);
-					sum += w * tmp(dstX, i);
+					float w = sc * filter((i + 0.5f - cen) / filterScaleY);
+					sum += w * tmp.data[i * dstW + dstX];
 					wsum += w;
 				}
 
-				out.data[dstY * dstW + dstX] = sum / wsum;
+				if (wsum == 0.0f) {
+					int mid = (start + end) >> 1;
+					if (mid < 0) mid = 0;
+					if (mid >= srcH) mid = srcH - 1;
+					out.data[dstY * dstW + dstX] = tmp.data[mid * dstW + dstX];
+				}
+				else {
+					int ic = (int)(cen + 0.5f);
+					if (ic < start) ic = start;
+					else if (ic >= end) ic = end - 1;
+					out.data[dstY * dstW + dstX] = sum + (1.0f - wsum) * tmp.data[ic * dstW + dstX];
+				}
 			}
 		}
 
