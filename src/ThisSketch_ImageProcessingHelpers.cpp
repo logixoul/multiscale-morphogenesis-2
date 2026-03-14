@@ -157,6 +157,15 @@ namespace ThisSketch {
 		return out;
 	}
 
+	class FilterGaussianNonNormalized : public FilterBase {
+	public:
+		FilterGaussianNonNormalized(float aSupport = 1.25f) : FilterBase(aSupport) {}
+
+		virtual float operator()(float x) const {
+			return (math<float>::exp(-2.0f * x * x));
+		}
+	};
+
 	Array2D<float> resizeGaussianCpuSimple2Trimmed(Array2D<float> const& src, ivec2 dstSize)
 	{
 		const int srcW = src.w;
@@ -167,7 +176,7 @@ namespace ThisSketch {
 		const float sx = dstW / (float)srcW;
 		const float sy = dstH / (float)srcH;
 
-		ci::FilterGaussian filter;
+		FilterGaussianNonNormalized filter;
 
 		const float filterScaleX = std::max(1.0f, 1.0f / sx);
 		const float filterScaleY = std::max(1.0f, 1.0f / sy);
@@ -192,18 +201,13 @@ namespace ThisSketch {
 
 				const float sc = (den == 0.0f) ? 1.0f : (1.0f / den);
 				float sum = 0.0f;
-				float wsum = 0.0f;
 				for (int i = start; i < end; ++i) {
 					float d = (i + 0.5f - cen) / filterScaleX;
 					float w = sc * filter(d);
 					sum += w * src.data[dstY * srcW + i];
-					wsum += w;
 				}
 
-				int ic = (int)(cen + 0.5f);
-				if (ic < start) ic = start;
-				else if (ic >= end) ic = end - 1;
-				tmp.data[dstY * dstW + dstX] = sum + (1.0f - wsum) * src.data[dstY * srcW + ic];
+				tmp.data[dstY * dstW + dstX] = sum;
 			}
 		}
 
@@ -222,18 +226,13 @@ namespace ThisSketch {
 			const float sc = (den == 0.0f) ? 1.0f : (1.0f / den);
 			for (int dstX = 0; dstX < dstW; ++dstX) {
 				float sum = 0.0f;
-				float wsum = 0.0f;
 				for (int i = start; i < end; ++i) {
 					float d = (i + 0.5f - cen) / filterScaleY;
 					float w = sc * filter(d);
 					sum += w * tmp.data[i * dstW + dstX];
-					wsum += w;
 				}
 
-				int ic = (int)(cen + 0.5f);
-				if (ic < start) ic = start;
-				else if (ic >= end) ic = end - 1;
-				out.data[dstY * dstW + dstX] = sum + (1.0f - wsum) * tmp.data[ic * dstW + dstX];
+				out.data[dstY * dstW + dstX] = sum;
 			}
 		}
 
