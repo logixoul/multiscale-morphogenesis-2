@@ -265,12 +265,11 @@ namespace ThisSketch {
 				const float cen = (dstX + .5f) / sx;
 				int start = (int)(cen - support + 0.5f);
 				int end = (int)(cen + support + 0.5f);
-				if (start < 0) start = 0;
-				if (end > srcW) end = srcW;
 
 				float sum = 0.0f;
 				float wsum = 0.0f;
 				for (int i = start; i < end; ++i) {
+					if (i < 0 || i >= srcW) continue;
 					float w = filter(i + 0.5f - cen);
 					sum += w * src.data[dstY * srcW + i];
 					wsum += w;
@@ -284,13 +283,12 @@ namespace ThisSketch {
 			const float cen = (dstY + .5f) / sy;
 			int start = (int)(cen - support + 0.5f);
 			int end = (int)(cen + support + 0.5f);
-			if (start < 0) start = 0;
-			if (end > srcH) end = srcH;
 
 			for (int dstX = 0; dstX < dstW; ++dstX) {
 				float sum = 0.0f;
 				float wsum = 0.0f;
 				for (int i = start; i < end; ++i) {
+					if (i < 0 || i >= srcH) continue;
 					float w = filter(i + 0.5f - cen);
 					sum += w * tmp.data[i * dstW + dstX];
 					wsum += w;
