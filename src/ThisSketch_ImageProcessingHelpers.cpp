@@ -92,6 +92,8 @@ namespace ThisSketch {
 		const int radiusX = 2;
 		const int radiusY = 2;
 
+		ci::FilterGaussian filter;
+
 		Array2D<float> tmp(dstSize.x, src.h);
 		Array2D<float> out(dstSize.x, dstSize.y);
 
@@ -152,8 +154,7 @@ namespace ThisSketch {
 
 		const float sx = dstW / (float)srcW;
 		const float sy = dstH / (float)srcH;
-		const float mapOffset = 0.5f;
-
+		
 		ci::FilterGaussian filter;
 
 		const float filterScaleX = std::max(1.0f, 1.0f / sx);
@@ -164,9 +165,9 @@ namespace ThisSketch {
 		Array2D<float> tmp(dstW, srcH);
 		Array2D<float> out(dstW, dstH);
 
-		for (int y = 0; y < srcH; ++y) {
-			for (int x = 0; x < dstW; ++x) {
-				const float cen = (x + mapOffset) / sx;
+		for (int dstY = 0; dstY < srcH; ++dstY) {
+			for (int dstX = 0; dstX < dstW; ++dstX) {
+				const float cen = (dstX + .5f) / sx;
 				int start = (int)(cen - supportX + 0.5f);
 				int end = (int)(cen + supportX + 0.5f);
 				if (start < 0) start = 0;
@@ -182,7 +183,7 @@ namespace ThisSketch {
 				float wsum = 0.0f;
 				for (int i = start; i < end; ++i) {
 					float w = sc * filter((i + 0.5f - cen) / filterScaleX);
-					sum += w * src.data[y * srcW + i];
+					sum += w * src.data[dstY * srcW + i];
 					wsum += w;
 				}
 
@@ -190,19 +191,19 @@ namespace ThisSketch {
 					int mid = (start + end) >> 1;
 					if (mid < 0) mid = 0;
 					if (mid >= srcW) mid = srcW - 1;
-					tmp.data[y * dstW + x] = src.data[y * srcW + mid];
+					tmp.data[dstY * dstW + dstX] = src.data[dstY * srcW + mid];
 				}
 				else {
 					int ic = (int)(cen + 0.5f);
 					if (ic < start) ic = start;
 					else if (ic >= end) ic = end - 1;
-					tmp.data[y * dstW + x] = sum + (1.0f - wsum) * src.data[y * srcW + ic];
+					tmp.data[dstY * dstW + dstX] = sum + (1.0f - wsum) * src.data[dstY * srcW + ic];
 				}
 			}
 		}
 
-		for (int y = 0; y < dstH; ++y) {
-			const float cen = (y + mapOffset) / sy;
+		for (int dstY = 0; dstY < dstH; ++dstY) {
+			const float cen = (dstY + .5f) / sy;
 			int start = (int)(cen - supportY + 0.5f);
 			int end = (int)(cen + supportY + 0.5f);
 			if (start < 0) start = 0;
@@ -214,12 +215,12 @@ namespace ThisSketch {
 			}
 
 			const float sc = (den == 0.0f) ? 1.0f : (1.0f / den);
-			for (int x = 0; x < dstW; ++x) {
+			for (int dstX = 0; dstX < dstW; ++dstX) {
 				float sum = 0.0f;
 				float wsum = 0.0f;
 				for (int i = start; i < end; ++i) {
 					float w = sc * filter((i + 0.5f - cen) / filterScaleY);
-					sum += w * tmp.data[i * dstW + x];
+					sum += w * tmp.data[i * dstW + dstX];
 					wsum += w;
 				}
 
@@ -227,13 +228,13 @@ namespace ThisSketch {
 					int mid = (start + end) >> 1;
 					if (mid < 0) mid = 0;
 					if (mid >= srcH) mid = srcH - 1;
-					out.data[y * dstW + x] = tmp.data[mid * dstW + x];
+					out.data[dstY * dstW + dstX] = tmp.data[mid * dstW + dstX];
 				}
 				else {
 					int ic = (int)(cen + 0.5f);
 					if (ic < start) ic = start;
 					else if (ic >= end) ic = end - 1;
-					out.data[y * dstW + x] = sum + (1.0f - wsum) * tmp.data[ic * dstW + x];
+					out.data[dstY * dstW + dstX] = sum + (1.0f - wsum) * tmp.data[ic * dstW + dstX];
 				}
 			}
 		}
@@ -254,19 +255,17 @@ namespace ThisSketch {
 		const float sy = dstH / (float)srcH;
 		const float mapOffset = 0.5f;
 
-		ci::FilterGaussian filter;
-
-		const float supportX = std::max(0.5f, filter.getSupport());
-		const float supportY = std::max(0.5f, filter.getSupport());
+		const float support = 1.25f;
+		ci::FilterGaussian filter(support);
 
 		Array2D<float> tmp(dstW, srcH);
 		Array2D<float> out(dstW, dstH);
 
-		for (int y = 0; y < srcH; ++y) {
-			for (int x = 0; x < dstW; ++x) {
-				const float cen = (x + mapOffset) / sx;
-				int start = (int)(cen - supportX + 0.5f);
-				int end = (int)(cen + supportX + 0.5f);
+		for (int dstY = 0; dstY < srcH; ++dstY) {
+			for (int dstX = 0; dstX < dstW; ++dstX) {
+				const float cen = (dstX + mapOffset) / sx;
+				int start = (int)(cen - support + 0.5f);
+				int end = (int)(cen + support + 0.5f);
 				if (start < 0) start = 0;
 				if (end > srcW) end = srcW;
 
@@ -280,21 +279,18 @@ namespace ThisSketch {
 				float wsum = 0.0f;
 				for (int i = start; i < end; ++i) {
 					float w = sc * filter((i + 0.5f - cen));
-					sum += w * src.data[y * srcW + i];
+					sum += w * src.data[dstY * srcW + i];
 					wsum += w;
 				}
 
-				int ic = (int)(cen + 0.5f);
-				if (ic < start) ic = start;
-				else if (ic >= end) ic = end - 1;
-				tmp.data[y * dstW + x] = sum + (1.0f - wsum) * src.data[y * srcW + ic];
+				tmp.data[dstY * dstW + dstX] = sum;
 			}
 		}
 
-		for (int y = 0; y < dstH; ++y) {
-			const float cen = (y + mapOffset) / sy;
-			int start = (int)(cen - supportY + 0.5f);
-			int end = (int)(cen + supportY + 0.5f);
+		for (int dstY = 0; dstY < dstH; ++dstY) {
+			const float cen = (dstY + mapOffset) / sy;
+			int start = (int)(cen - support + 0.5f);
+			int end = (int)(cen + support + 0.5f);
 			if (start < 0) start = 0;
 			if (end > srcH) end = srcH;
 
@@ -304,19 +300,16 @@ namespace ThisSketch {
 			}
 
 			const float sc = (den == 0.0f) ? 1.0f : (1.0f / den);
-			for (int x = 0; x < dstW; ++x) {
+			for (int dstX = 0; dstX < dstW; ++dstX) {
 				float sum = 0.0f;
 				float wsum = 0.0f;
 				for (int i = start; i < end; ++i) {
 					float w = sc * filter((i + 0.5f - cen));
-					sum += w * tmp.data[i * dstW + x];
+					sum += w * tmp.data[i * dstW + dstX];
 					wsum += w;
 				}
 
-				int ic = (int)(cen + 0.5f);
-				if (ic < start) ic = start;
-				else if (ic >= end) ic = end - 1;
-				out.data[y * dstW + x] = sum + (1.0f - wsum) * tmp.data[ic * dstW + x];
+				out.data[dstY * dstW + dstX] = sum;
 			}
 		}
 
