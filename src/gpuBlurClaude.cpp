@@ -99,7 +99,7 @@ namespace gpuBlurClaude {
 			if(minDim <= 2)
 				break;
 			ivec2 dstSize = ivec2(state->getWidth() * scalePerLevel, state->getHeight() * scalePerLevel);
-			state = singleblurLikeCinder(state, dstSize, downscaleSigma, GL_CLAMP_TO_BORDER);
+			state = singleblurLikeCinder(state, dstSize, downscaleSigma, GL_CLAMP_TO_EDGE);
 			result.push_back(state);
 		}
 		return result;

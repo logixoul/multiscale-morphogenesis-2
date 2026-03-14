@@ -242,7 +242,9 @@ namespace ThisSketch {
 
 			Array2D<float> dbgImg(20, 20, 0.0f);
 
-			dbgImg(19, 0) = 0.3f;
+			dbgImg(19, 0) = 1.0f;
+			dbgImg(19, 19) = 1.0f;
+			dbgImg(0, 19) = 1.0f;
 			dbgImg(6, 6) = 1.0f;
 			dbgImg(6, 7) = 1.0f;
 			ci::FilterGaussian filter;
@@ -259,7 +261,7 @@ namespace ThisSketch {
 				_out.r = f*100.0;
 				)
 			);
-			//tex = options.pyramidOld ? texOld : texNew;
+			tex = options.pyramidOld ? texOld : texNew;
 			tex->setMagFilter(GL_NEAREST);
 			gl::draw(tex, getWindowBounds());
 		}
