@@ -274,11 +274,10 @@ namespace ThisSketch {
 					den += filter((i + 0.5f - cen));
 				}
 
-				const float sc = (den == 0.0f) ? 1.0f : (1.0f / den);
 				float sum = 0.0f;
 				float wsum = 0.0f;
 				for (int i = start; i < end; ++i) {
-					float w = sc * filter((i + 0.5f - cen));
+					float w = filter((i + 0.5f - cen)) / den;
 					sum += w * src.data[dstY * srcW + i];
 					wsum += w;
 				}
@@ -299,12 +298,11 @@ namespace ThisSketch {
 				den += filter((i + 0.5f - cen));
 			}
 
-			const float sc = (den == 0.0f) ? 1.0f : (1.0f / den);
 			for (int dstX = 0; dstX < dstW; ++dstX) {
 				float sum = 0.0f;
 				float wsum = 0.0f;
 				for (int i = start; i < end; ++i) {
-					float w = sc * filter((i + 0.5f - cen));
+					float w = filter((i + 0.5f - cen)) / den;
 					sum += w * tmp.data[i * dstW + dstX];
 					wsum += w;
 				}
