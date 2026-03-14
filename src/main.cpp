@@ -220,7 +220,7 @@ namespace ThisSketch {
 			drawDbg();
 		}
 		void drawDbg() {
-			const int lvl = 3;
+			const int lvl = 1;
 
 			/*Array2D<float> dbgImg(20, 20, 0.0f);
 			dbgImg(5, 5) = 100.0f;
@@ -234,7 +234,7 @@ namespace ThisSketch {
 				float fOld = fetch1();
 				float fNew = fetch1(tex2);
 				float f = abs(fOld - fNew);
-				_out.r = f*1.0;
+				_out.r = f*100.0;
 				)
 			);
 			//tex = options.pyramidOld ? texOld : texNew;

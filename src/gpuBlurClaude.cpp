@@ -15,30 +15,26 @@ namespace gpuBlurClaude {
 		GPU_SCOPE("singleblur");
 		float gaussW = sigma == -1.0f ? 4.0f : sigma;
 		
-		float w0 = gpuBlur2_5::gauss(0.0, gaussW);
-		float w1 = gpuBlur2_5::gauss(1.0, gaussW);
-		float w2 = gpuBlur2_5::gauss(2.0, gaussW);
-		float sum = 2.0f * (w1 + w2) + w0;
-		w2 /= sum;
-		w1 /= sum;
-		w0 /= sum;
-		stringstream weights;
-		weights << fixed << "float w0=" << w0 << ", w1=" << w1 << ", w2=" << w2 << ";" << endl;
-		
 		string shader =
 			"int x = int(gl_FragCoord.x);"
 			"int y = int(gl_FragCoord.y);"
 			"float srcX = (x + 0.5f) * scaleX - 0.5f;"
 			"float srcY = (y + 0.5f) * scaleY - 0.5f;"
-			"vec2 srcPos = vec2(srcX, srcY);"
-			"vec2 offset = vec2(GB2_offsetX, GB2_offsetY);"
-			"vec3 a[5];"
-			"for (int i = -2; i <= 2; i++) {"
-			"	ivec2 fetchPos = ivec2(srcPos + float(i) * offset + vec2(.5));"
-			"	a[i+2] = texelFetch(tex, fetchPos, 0).rgb;"
+			"float srcPos = (isHorizontal != 0) ? srcX : srcY;"
+			"int srcLen = (isHorizontal != 0) ? int(texSize.x) : int(texSize.y);"
+			"float sum = 0.0;"
+			"float wsum = 0.0;"
+			"for (int k = -2; k <= 2; ++k) {"
+			"    int i = int(floor(srcPos + float(k) + 0.5));"
+			"    if (i < 0 || i >= srcLen) continue;"
+			"    float d = (float(i) - srcPos) / sigma;"
+			"    float w = exp(-0.5 * d * d);"
+			"    ivec2 p = (isHorizontal != 0) ? ivec2(i, y) : ivec2(x, i);"
+			"    sum += w * texelFetch(tex, p, 0).r;"
+			"    wsum += w;"
 			"}"
-			+ weights.str() +
-			"_out.rgb = w2 * (a[0] + a[4]) + w1 * (a[1] + a[3]) + w0 * a[2];";
+			"_out.r = sum / wsum;"
+			;
 
 		setWrap(src, wrap);
 		if (wrap == GL_CLAMP_TO_BORDER) {
@@ -48,22 +44,22 @@ namespace gpuBlurClaude {
 		auto hscaled = shade2(src, shader,
 			ShadeOpts()
 			.scale(hscale, 1.0f)
-			.uniform("scaleX", hscale)
+			.uniform("scaleX", 1.0f / hscale)
 			.uniform("scaleY", 1.0f)
-			.uniform("GB2_offsetX", 1.0f)
-			.uniform("GB2_offsetY", 0.0f)
+			.uniform("isHorizontal", 1)
+			.uniform("sigma", gaussW)
 		);
 		setWrap(hscaled, wrap);
 		if (wrap == GL_CLAMP_TO_BORDER) {
-			setTextureBorderColor(src, 0, 0, 0, 0);
+			setTextureBorderColor(hscaled, 0, 0, 0, 0);
 		}
 		auto vscaled = shade2(hscaled, shader,
 			ShadeOpts()
-			.uniform("GB2_offsetX", 0.0f)
-			.uniform("GB2_offsetY", 1.0f)
 			.scale(1.0f, vscale)
 			.uniform("scaleX", 1.0f)
-			.uniform("scaleY", vscale));
+			.uniform("scaleY", 1.0f / vscale)
+			.uniform("isHorizontal", 0)
+			.uniform("sigma", gaussW));
 		return vscaled;
 	}
 
