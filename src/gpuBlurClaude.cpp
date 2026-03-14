@@ -23,8 +23,6 @@ namespace gpuBlurClaude {
 		string shaderH =
 			"int dstX = int(gl_FragCoord.x);"
 			"int dstY = int(gl_FragCoord.y);"
-			"float srcX = (dstX + 0.5f) / scaleX;"
-			"float srcY = (dstY + 0.5f) / scaleY;"
 			"float filterScaleX = max(1.0f, 1.0f / scaleX);"
 			"float support = max(0.5f, filterScaleX * 1.25);"
 			"float sum = 0.0;"
@@ -46,8 +44,6 @@ namespace gpuBlurClaude {
 		string shaderV =
 			"int dstX = int(gl_FragCoord.x);"
 			"int dstY = int(gl_FragCoord.y);"
-			"float srcX = (dstX + 0.5f) / scaleX;"
-			"float srcY = (dstY + 0.5f) / scaleY;"
 			"float filterScaleY = max(1.0f, 1.0f / scaleY);"
 			"float support = max(0.5f, filterScaleY * 1.25);"
 			"float sum = 0.0;"
