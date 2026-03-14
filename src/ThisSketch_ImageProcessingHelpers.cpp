@@ -253,8 +253,7 @@ namespace ThisSketch {
 
 		const float sx = dstW / (float)srcW;
 		const float sy = dstH / (float)srcH;
-		const float mapOffset = 0.5f;
-
+		
 		const float support = 1.25f;
 		ci::FilterGaussian filter(support);
 
@@ -263,51 +262,41 @@ namespace ThisSketch {
 
 		for (int dstY = 0; dstY < srcH; ++dstY) {
 			for (int dstX = 0; dstX < dstW; ++dstX) {
-				const float cen = (dstX + mapOffset) / sx;
+				const float cen = (dstX + .5f) / sx;
 				int start = (int)(cen - support + 0.5f);
 				int end = (int)(cen + support + 0.5f);
 				if (start < 0) start = 0;
 				if (end > srcW) end = srcW;
 
-				float den = 0.0f;
-				for (int i = start; i < end; ++i) {
-					den += filter((i + 0.5f - cen));
-				}
-
 				float sum = 0.0f;
 				float wsum = 0.0f;
 				for (int i = start; i < end; ++i) {
-					float w = filter((i + 0.5f - cen)) / den;
+					float w = filter(i + 0.5f - cen);
 					sum += w * src.data[dstY * srcW + i];
 					wsum += w;
 				}
 
-				tmp.data[dstY * dstW + dstX] = sum;
+				tmp.data[dstY * dstW + dstX] = sum / wsum;
 			}
 		}
 
 		for (int dstY = 0; dstY < dstH; ++dstY) {
-			const float cen = (dstY + mapOffset) / sy;
+			const float cen = (dstY + .5f) / sy;
 			int start = (int)(cen - support + 0.5f);
 			int end = (int)(cen + support + 0.5f);
 			if (start < 0) start = 0;
 			if (end > srcH) end = srcH;
 
-			float den = 0.0f;
-			for (int i = start; i < end; ++i) {
-				den += filter((i + 0.5f - cen));
-			}
-
 			for (int dstX = 0; dstX < dstW; ++dstX) {
 				float sum = 0.0f;
 				float wsum = 0.0f;
 				for (int i = start; i < end; ++i) {
-					float w = filter((i + 0.5f - cen)) / den;
+					float w = filter(i + 0.5f - cen);
 					sum += w * tmp.data[i * dstW + dstX];
 					wsum += w;
 				}
 
-				out.data[dstY * dstW + dstX] = sum;
+				out.data[dstY * dstW + dstX] = sum / wsum;
 			}
 		}
 
