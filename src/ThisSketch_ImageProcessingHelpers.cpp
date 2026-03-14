@@ -215,17 +215,14 @@ namespace ThisSketch {
 			if (end > srcH) end = srcH;
 
 			
-			float den = 0.0f;
-			for (int i = start; i < end; ++i) {
-				den += filter((i + 0.5f - cen) / filterScaleY);
-			}
-
 			for (int dstX = 0; dstX < dstW; ++dstX) {
 				float sum = 0.0f;
+				float den = 0.0f;
 				for (int i = start; i < end; ++i) {
 					float d = (i + 0.5f - cen) / filterScaleY;
 					float w = filter(d);
 					sum += w * tmp.data[i * dstW + dstX];
+					den += w;
 				}
 
 				out.data[dstY * dstW + dstX] = sum / den;
