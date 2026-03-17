@@ -57,7 +57,7 @@
     <ClCompile Include="util.cpp">
       <Filter>lxlib</Filter>
     </ClCompile>
-    <ClCompile Include="cfg2.cpp" />
+    <ClCompile Include="ConfigManager3.cpp" />
     <ClCompile Include="CinderImGui.cpp" />
     <ClCompile Include="gpuBlurClaude.cpp" />
     <ClCompile Include="main_old_3d.cpp" />
@@ -95,7 +95,7 @@
     <ClInclude Include="util.h">
       <Filter>lxlib</Filter>
     </ClInclude>
-    <ClInclude Include="cfg2.h" />
+    <ClInclude Include="ConfigManager3.h" />
     <ClInclude Include="CinderImGui.h" />
     <ClInclude Include="CinderImGuiConfig.h" />
     <ClInclude Include="gpuBlurClaude.h" />

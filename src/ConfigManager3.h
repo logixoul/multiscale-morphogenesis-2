@@ -3,14 +3,14 @@
 #include "CinderImGui.h"
 #include "toml.hpp"
 
-struct cfg2
+struct ConfigManager3
 {
 private:
 	toml::table tbl;
 public:
-	cfg2();
+	ConfigManager3();
 	bool getBool(string const& name);
-	int getInt(string const& name, int min, int max, int defaultValue, ImGuiSliderFlags flags = ImGuiSliderFlags_::ImGuiSliderFlags_None);
+	//int getInt(string const& name, int min, int max, int defaultValue, ImGuiSliderFlags flags = ImGuiSliderFlags_::ImGuiSliderFlags_None);
 	float getFloat(string const& name);
 	void begin();
 	void end();

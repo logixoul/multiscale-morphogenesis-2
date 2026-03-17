@@ -1,9 +1,9 @@
 #include "precompiled.h"
-#include "cfg2.h"
+#include "ConfigManager3.h"
 #include "CinderImGui.h"
 
 
-cfg2::cfg2()
+ConfigManager3::ConfigManager3()
 {
 	ImGui::Initialize();
 	ImGuiIO& io = ImGui::GetIO();
@@ -12,12 +12,12 @@ cfg2::cfg2()
 	tbl = toml::parse_file("config.toml");
 }
 
-void cfg2::begin()
+void ConfigManager3::begin()
 {
 	ImGui::Begin("Parameters");
 }
 
-void cfg2::end()
+void ConfigManager3::end()
 {
 	ImGui::End();
 }
@@ -30,7 +30,7 @@ template<class T> T& getOpt_Base(string const& name, T defaultValue) {
 	return m[name];
 }
 
-/*int cfg2::getInt(string const& name, int min, int max, int defaultValue, ImGuiSliderFlags flags) {
+/*int ConfigManager3::getInt(string const& name, int min, int max, int defaultValue, ImGuiSliderFlags flags) {
 
 	auto& ref = getOpt_Base<int>(name, defaultValue);
 	ImGui::DragInt(name.c_str(), &ref, 1.0f, min, max, "%d", flags);
@@ -38,7 +38,7 @@ template<class T> T& getOpt_Base(string const& name, T defaultValue) {
 }*/
 
 // Note: using value_or throughout to handle the "entire table doesn't exist" possibility
-float cfg2::getFloat(string const& name) {
+float ConfigManager3::getFloat(string const& name) {
 	auto subTable = tbl.at_path("param." + name);
 	float& ref = getOpt_Base<float>(name, subTable["default"].value_or(0.5));
 
@@ -55,7 +55,7 @@ float cfg2::getFloat(string const& name) {
 }
 
 // Note: using value_or throughout to handle the "entire table doesn't exist" possibility
-bool cfg2::getBool(string const& name) {
+bool ConfigManager3::getBool(string const& name) {
 	auto val = tbl.at_path("param." + name);
 	auto& ref = getOpt_Base<bool>(name, val["default"].value_or(false));
 	ImGui::Checkbox(name.c_str(), &ref);

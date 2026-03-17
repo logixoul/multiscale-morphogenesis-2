@@ -158,7 +158,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="events.cpp" />
-    <ClCompile Include="cfg2.cpp" />
+    <ClCompile Include="ConfigManager3.cpp" />
     <ClCompile Include="gpgpu.cpp" />
     <ClCompile Include="colorspaces.cpp" />
     <ClCompile Include="cfg1.cpp" />
@@ -195,7 +195,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </ClInclude>
-    <ClInclude Include="cfg2.h" />
+    <ClInclude Include="ConfigManager3.h" />
     <ClInclude Include="gpgpu.h" />
     <ClInclude Include="gpuBlur2_5.h">
     </ClInclude>

@@ -3,10 +3,9 @@
 #include "stuff.h"
 #include "Array2D_imageProc.h"
 #include "gpgpu.h"
-#include "cfg2.h"
+#include "ConfigManager3.h"
 #include "ThisSketch_ImageProcessingHelpers.h"
 #include "stefanfw.h"
-#include "CrossThreadCallQueue.h"
 #include "gpuBlurClaude.h"
 
 int wsx = 700, wsy = 700;
@@ -24,7 +23,7 @@ namespace ThisSketch {
 			bool multiscale;
 			bool binarizePostprocessing;
 			float highPassStrength;
-			cfg2 cfg;
+			ConfigManager3 cfg;
 
 			void update() {
 				cfg.begin();
@@ -71,7 +70,7 @@ namespace ThisSketch {
 			}
 			if (e.getChar() == 'd')
 			{
-				//cfg2::params->isVisible() ? cfg2::params->hide() : cfg2::params->show();
+				//ConfigManager3::params->isVisible() ? ConfigManager3::params->hide() : ConfigManager3::params->show();
 			}
 		}
 		void reset() {
@@ -241,8 +240,6 @@ namespace ThisSketch {
 	};
 
 }
-
-CrossThreadCallQueue* gMainThreadCallQueue;
 
 CINDER_APP(ThisSketch::SApp, RendererGl(),
 	[&](ci::app::App::Settings* settings)
